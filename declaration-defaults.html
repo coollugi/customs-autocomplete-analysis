@@ -21,7 +21,6 @@
   .report-header h1 { font-size: 28px; margin-bottom: 8px; }
   .report-header .subtitle { font-size: 18px; opacity: 0.85; margin-bottom: 20px; }
   .report-header .meta { font-size: 14px; opacity: 0.7; }
-  .report-header .meta span { margin-right: 24px; }
   .report-header .back { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 16px; }
   .report-header .back:hover { color: white; }
   .section { background: white; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -55,14 +54,14 @@
   ul, ol { margin: 8px 0 12px 24px; color: var(--gray-700); }
   li { margin-bottom: 4px; }
   .footnote { font-size: 12px; color: var(--gray-500); margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
-  .tab-bar { display: flex; gap: 0; background: white; border-radius: 12px 12px 0 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 0; overflow: hidden; position: sticky; top: 0; z-index: 10; }
+  .tab-bar { display: flex; gap: 0; background: white; border-radius: 12px 12px 0 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; position: sticky; top: 0; z-index: 10; }
   .tab-btn { flex: 1; padding: 16px 24px; font-size: 16px; font-weight: 600; border: none; background: var(--gray-100); color: var(--gray-500); cursor: pointer; transition: all 0.2s; font-family: inherit; }
   .tab-btn:hover { background: var(--gray-200); }
   .tab-btn.active { background: white; color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
   .tab-btn.active-green { background: white; color: var(--success); box-shadow: inset 0 -3px 0 var(--success); }
   .tab-content { display: none; }
-  .tab-content.active { display: block; }
-  .tab-optimize .section h2 { color: var(--success); border-bottom-color: var(--success-light); }
+  .tab-content.active { display: block; padding-top: 24px; }
+  #tab-optimize .section h2 { color: var(--success); border-bottom-color: var(--success-light); }
   @media print { body { background: white; } .container { padding: 0; } .report-header { border-radius: 0; } .section { box-shadow: none; border: 1px solid var(--gray-200); break-inside: avoid; } .tab-bar { display: none; position: static; } .tab-content { display: block !important; } }
   @media (max-width: 768px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .comparison-grid { grid-template-columns: 1fr; } }
 </style>
@@ -83,13 +82,6 @@
 </div>
 
 <div id="tab-current" class="tab-content active">
-<div class="meta">
-    <span>2026-04-15</span>
-    
-  </div>
-</div>
-
-<!-- Scope -->
 <div class="section">
   <p><strong>涵蓋範圍</strong>：建單預設值 / 預設值運作機制 / 通關網路 / 運輸方式碼 / 費用自動產生 / 項次預設 / 欄位變更連動</p>
   <div class="stat-grid">
@@ -100,7 +92,6 @@
   </div>
 </div>
 
-<!-- ===== 一、預設值運作機制 ===== -->
 <div class="section">
   <h2>一、預設值的運作機制</h2>
 
@@ -152,7 +143,6 @@
   <p class="footnote">注意：空運進口（CI）因多了包裝單位/貿易條件/幣別三個欄位，後續欄位的位移會不同。</p>
 </div>
 
-<!-- ===== 二、各站預設值 ===== -->
 <div class="section">
   <h2>二、各站別的預設值明細</h2>
 
@@ -265,7 +255,6 @@
   </table>
 </div>
 
-<!-- ===== 卸存地點 ===== -->
 <div class="section">
   <h2>三、卸存地點（貨物存放處所）自動帶入</h2>
 
@@ -351,7 +340,6 @@
   </div>
 </div>
 
-<!-- ===== 客戶偏好分析 ===== -->
 <div class="section">
   <h2>四、客戶偏好自動帶入 — 數據分析</h2>
 
@@ -396,7 +384,6 @@
   </div>
 </div>
 
-<!-- ===== 五、通關網路 ===== -->
 <div class="section">
   <h2>五、通關網路（TRADEPTNER）</h2>
 
@@ -444,7 +431,6 @@
   </table>
 </div>
 
-<!-- ===== 四、運輸方式碼 ===== -->
 <div class="section">
   <h2>六、運輸方式碼（TPT_MODE）— 新舊格式並存</h2>
 
@@ -483,7 +469,6 @@
   <p>LRP 在費用匹配（帳單設定 CUSTBILLTO）和運輸帳單處理時，仍會先用 <code>Trans_TPT_MODE_to_OLD()</code> 將 2 碼轉回 1 碼，因為帳單對照表尚未更新為 2 碼格式。</p>
 </div>
 
-<!-- ===== 五、費用矩陣 ===== -->
 <div class="section">
   <h2>七、費用自動產生</h2>
 
@@ -517,7 +502,6 @@
   </table>
 </div>
 
-<!-- ===== 六、項次預設 ===== -->
 <div class="section">
   <h2>八、項次預設值</h2>
   <p>新增報單項次時，自動從表頭帶入：</p>
@@ -533,7 +517,6 @@
   </table>
 </div>
 
-<!-- ===== 七、連動規則 ===== -->
 <div class="section">
   <h2>九、欄位變更連動規則</h2>
 
@@ -578,7 +561,6 @@
   </table>
 </div>
 
-<!-- ===== 八、轉口 ===== -->
 <div class="section">
   <h2>十、轉口報單（CT/FT）特殊規則</h2>
   <table>
@@ -590,7 +572,6 @@
   </table>
 </div>
 
-<!-- ===== 九、DB 來源 ===== -->
 <div class="section">
   <h2>十一、相關 DB 表索引</h2>
   <table>
@@ -609,14 +590,7 @@
 </div>
 </div>
 
-<div id="tab-optimize" class="tab-content tab-optimize">
-<div class="meta">
-    <span>2026-04-15</span>
-    
-  </div>
-</div>
-
-<!-- Summary -->
+<div id="tab-optimize" class="tab-content">
 <div class="section">
   <h2>優化總覽</h2>
   <p>以下為 LRP 現行報單建立自動化規則與 新系統設計的交叉比對結果，分為三類：</p>
@@ -627,7 +601,6 @@
   </div>
 </div>
 
-<!-- 一、參數儲存 -->
 <div class="section">
   <h2>一、參數儲存方式現代化</h2>
 
@@ -662,7 +635,6 @@
   </div>
 </div>
 
-<!-- 二、客戶偏好 -->
 <div class="section">
   <h2>二、客戶偏好自動帶入（數據驅動新功能）</h2>
 
@@ -700,7 +672,6 @@
   </div>
 </div>
 
-<!-- 三、運輸方式碼 -->
 <div class="section">
   <h2>三、運輸方式碼統一為 2 碼</h2>
 <!-- renumber done: 二=客戶偏好, 三=運輸方式, 四=費用, 五=連動, 六=轉口, 七=通關網路, 八=共用預設 -->
@@ -738,7 +709,6 @@
   </div>
 </div>
 
-<!-- 三、費用 -->
 <div class="section">
   <h2>四、費用自動產生可設定化</h2>
 
@@ -767,7 +737,6 @@
   </table>
 </div>
 
-<!-- 三、連動規則 -->
 <div class="section">
   <h2>五、欄位連動規則簡化</h2>
 
@@ -811,7 +780,6 @@
   </table>
 </div>
 
-<!-- 四、轉口 -->
 <div class="section">
   <h2>六、轉口報單特殊規則優化</h2>
 
@@ -835,7 +803,6 @@
   </table>
 </div>
 
-<!-- 五、通關網路 -->
 <div class="section">
   <h2>七、通關網路傳輸路由簡化</h2>
 
@@ -857,7 +824,6 @@
   </div>
 </div>
 
-<!-- 六、共用預設 -->
 <div class="section">
   <h2>八、共用預設值處理方式</h2>
 
@@ -872,7 +838,6 @@
   </table>
 </div>
 
-<!-- 七、總結 -->
 <div class="section">
   <h2>優化行動總結</h2>
 
@@ -903,7 +868,7 @@ function switchTab(t,b){
   document.querySelectorAll('.tab-btn').forEach(function(e){e.classList.remove('active');e.classList.remove('active-green')});
   document.getElementById('tab-'+t).classList.add('active');
   b.classList.add(t==='optimize'?'active-green':'active');
-  window.scrollTo(0,document.querySelector('.tab-bar').offsetTop-20);
+  window.scrollTo(0,document.querySelector('.tab-bar').offsetTop);
 }
 </script>
 </body>
