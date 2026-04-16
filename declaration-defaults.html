@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新系統報關模組 — 報單建立自動化規則</title>
+<style>
+  :root {
+    --primary: #1a56db; --primary-light: #e8eefb;
+    --success: #059669; --success-light: #ecfdf5;
+    --warning: #d97706; --warning-light: #fffbeb;
+    --danger: #dc2626; --danger-light: #fef2f2;
+    --orange: #ea580c; --orange-light: #fff7ed;
+    --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+    --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; color: var(--gray-900); line-height: 1.7; background: var(--gray-50); }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+  .report-header { background: linear-gradient(135deg, #1e3a5f 0%, #1a56db 100%); color: white; padding: 60px 40px; border-radius: 16px; margin-bottom: 24px; }
+  .report-header h1 { font-size: 28px; margin-bottom: 8px; }
+  .report-header .subtitle { font-size: 18px; opacity: 0.85; margin-bottom: 20px; }
+  .report-header .meta { font-size: 14px; opacity: 0.7; }
+  .report-header .meta span { margin-right: 24px; }
+  .report-header .back { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 16px; }
+  .report-header .back:hover { color: white; }
+  .section { background: white; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .section h2 { font-size: 22px; color: var(--primary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--primary-light); }
+  .section h3 { font-size: 17px; color: var(--gray-700); margin: 24px 0 12px 0; }
+  h4 { font-size: 15px; margin: 20px 0 8px; color: var(--gray-500); }
+  .section p { margin-bottom: 12px; color: var(--gray-700); }
+  .highlight-box { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .warning-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .success-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .orange-box { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--gray-100); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); }
+  tr:hover td { background: var(--gray-50); }
+  td.center { text-align: center; }
+  td.check { text-align: center; color: var(--success); font-weight: 700; }
+  td.dash { text-align: center; color: var(--gray-200); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { background: var(--gray-100); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", "Fira Code", "Menlo", monospace; font-size: 13px; }
+  .code-block { background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 20px 24px; font-family: "SF Mono", "Fira Code", "Menlo", monospace; font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 16px 0; white-space: pre; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0; }
+  .stat-card { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 20px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: var(--primary); }
+  .stat-card .label { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
+  .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  .comparison-card { border: 1px solid var(--gray-200); border-radius: 12px; padding: 20px; }
+  .comparison-card h4 { margin: 0 0 12px; font-size: 16px; color: var(--gray-900); }
+  .comparison-card.old { border-top: 4px solid var(--danger); background: var(--danger-light); }
+  .comparison-card.new { border-top: 4px solid var(--success); background: var(--success-light); }
+  ul, ol { margin: 8px 0 12px 24px; color: var(--gray-700); }
+  li { margin-bottom: 4px; }
+  .footnote { font-size: 12px; color: var(--gray-500); margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
+  .tab-bar { display: flex; gap: 0; background: white; border-radius: 12px 12px 0 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 0; overflow: hidden; position: sticky; top: 0; z-index: 10; }
+  .tab-btn { flex: 1; padding: 16px 24px; font-size: 16px; font-weight: 600; border: none; background: var(--gray-100); color: var(--gray-500); cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .tab-btn:hover { background: var(--gray-200); }
+  .tab-btn.active { background: white; color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+  .tab-btn.active-green { background: white; color: var(--success); box-shadow: inset 0 -3px 0 var(--success); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .tab-optimize .section h2 { color: var(--success); border-bottom-color: var(--success-light); }
+  @media print { body { background: white; } .container { padding: 0; } .report-header { border-radius: 0; } .section { box-shadow: none; border: 1px solid var(--gray-200); break-inside: avoid; } .tab-bar { display: none; position: static; } .tab-content { display: block !important; } }
+  @media (max-width: 768px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .comparison-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="report-header">
+  <a class="back" href="index.html">&larr; 回到報告列表</a>
+  <h1>新系統報關模組</h1>
+  <div class="subtitle">報單建立自動化規則</div>
+  <div class="meta"><span>2026-04-16</span></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('current',this)">現行規則分析</button>
+  <button class="tab-btn" onclick="switchTab('optimize',this)">優化建議</button>
+</div>
+
+<div id="tab-current" class="tab-content active">
+<div class="meta">
+    <span>2026-04-15</span>
+    <span>新系統報關模組</span>
+  </div>
+</div>
+
+<!-- Scope -->
+<div class="section">
+  <p><strong>涵蓋範圍</strong>：建單預設值 / 預設值運作機制 / 通關網路 / 運輸方式碼 / 費用自動產生 / 項次預設 / 欄位變更連動</p>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">82</div><div class="label">建單參數組合</div></div>
+    <div class="stat-card"><div class="num">12</div><div class="label">自動費用碼</div></div>
+    <div class="stat-card"><div class="num">14</div><div class="label">欄位連動規則</div></div>
+    <div class="stat-card"><div class="num">50+</div><div class="label">共用預設欄位</div></div>
+  </div>
+</div>
+
+<!-- ===== 一、預設值運作機制 ===== -->
+<div class="section">
+  <h2>一、預設值的運作機制</h2>
+
+  <h3>OP 開新報單時發生了什麼？</h3>
+  <p>OP 選擇業務別（空/海運、進/出口）後，系統根據<strong>三個條件</strong>自動決定要載入哪一組預設值：</p>
+
+  <table>
+    <tr><th>條件</th><th>來源</th><th>範例</th></tr>
+    <tr><td>業務別 (DEP)</td><td>OP 選擇</td><td>FI（海運進口）、CE（空運出口）</td></tr>
+    <tr><td>區內外 (SCIAREA_YN)</td><td>OP 選擇</td><td>N（區外）、Y（區內/科學園區）</td></tr>
+    <tr><td>站別 (STATION)</td><td>OP 登入帳號所屬站</td><td>AJ100（竹科）、AF110（高雄）</td></tr>
+  </table>
+
+  <p>這三個條件組合出一個參數代碼（PARA_CODE），從系統參數表 PLMPARM 拉出對應的預設值。</p>
+
+  <h3>PLMPARM 參數查詢的 fallback 順序</h3>
+  <div class="highlight-box">
+    <ol>
+      <li>公司 + 站別<strong>完全匹配</strong></li>
+      <li>只匹配公司</li>
+      <li>只匹配站別</li>
+      <li>取第一筆（<strong>全站預設</strong>）</li>
+    </ol>
+  </div>
+
+  <h3>參數代碼對照</h3>
+  <table>
+    <tr><th>DEP</th><th>區外(N)</th><th>區內(Y)</th><th>園區通關(CPT)區外</th><th>園區通關(CPT)區內</th></tr>
+    <tr><td>FI 海運進口</td><td><code>FI01</code></td><td><code>FI01S</code></td><td><code>CPTFI</code></td><td><code>CPTFIS</code></td></tr>
+    <tr><td>FE 海運出口</td><td><code>FE01</code></td><td><code>FE01S</code></td><td><code>CPTFE</code></td><td><code>CPTFES</code></td></tr>
+    <tr><td>CI 空運進口</td><td><code>CI01</code></td><td><code>CI01S</code></td><td><code>CPTCI</code></td><td><code>CPTCIS</code></td></tr>
+    <tr><td>CE 空運出口</td><td><code>CE01</code></td><td><code>CE01S</code></td><td><code>CPTCE</code></td><td><code>CPTCES</code></td></tr>
+    <tr><td>FT 轉口</td><td><code>FT01</code></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+  </table>
+
+  <h3>參數值的儲存方式</h3>
+  <p>每筆 PLMPARM 的 <code>PARA_VALUE</code> 是一個 65~82 字元的固定位置字串，各欄位值按固定位移截取：</p>
+  <div class="code-block">BSB6310000725CUSTOM02  CTN2YYY180.00000.05 24.000.0006   200  YYY82001
+││││││││││││││────────│ │││ │
+│││││││││││││└────────┘ │││ └ 運輸方式 = 2
+│││││││││││││ 通關網路   │││
+│││││││││││││=CUSTOM02  │││
+││││││││└────┘           │││
+│││││└─┘ 專責代碼=00725  │││
+││││└──┘ 信箱附碼=0      │││
+│││└───┘ 信箱=310        │││
+││└──┘ 報單類型=B6       │││
+└─┘ 報單前綴=BS          │││</div>
+  <p class="footnote">注意：空運進口（CI）因多了包裝單位/貿易條件/幣別三個欄位，後續欄位的位移會不同。</p>
+</div>
+
+<!-- ===== 二、各站預設值 ===== -->
+<div class="section">
+  <h2>二、各站別的預設值明細</h2>
+
+  <h3>海運進口（FI）&mdash; 區外</h3>
+  <table>
+    <tr><th>欄位</th><th>桃園(預設)</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>BS</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>報單類型</td><td>B6</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>信箱</td><td>310</td><td>543</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>00725</td><td>00D67</td><td>00427</td><td>00801</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td></tr>
+    <tr><td>運輸方式</td><td>2</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+  </table>
+
+  <h3>海運進口（FI）&mdash; 區內</h3>
+  <table>
+    <tr><th>欄位</th><th>全站預設</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>AA</td><td>CS</td><td>DS</td><td>BS</td><td>BS</td></tr>
+    <tr><td>報單類型</td><td>G1</td><td>B6</td><td>B6</td><td>B6</td><td>B6</td></tr>
+    <tr><td>信箱</td><td>666</td><td>014</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>66666</td><td>00942</td><td>00427</td><td>00801</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM01</td><td>CUSTOM03</td><td>CTSP</td><td>CUSTOM04</td><td>CUSTOM04</td></tr>
+  </table>
+
+  <h3>海運出口（FE）&mdash; 區外</h3>
+  <table>
+    <tr><th>欄位</th><th>桃園(預設)</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>BS</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>報單類型</td><td>B9</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>信箱</td><td>310</td><td>543</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>00725</td><td>00D67</td><td>00427</td><td>00801</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td><td>CUSTOM02</td></tr>
+  </table>
+
+  <h3>海運出口（FE）&mdash; 區內</h3>
+  <table>
+    <tr><th>欄位</th><th>全站預設</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>AA</td><td>CS</td><td>DS</td><td>BS</td><td>BS</td></tr>
+    <tr><td>報單類型</td><td>G5</td><td>B9</td><td>(空)</td><td>B9</td><td>B9</td></tr>
+    <tr><td>信箱</td><td>A18</td><td>014</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>00035</td><td>00942</td><td>00427</td><td>00801</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM01</td><td>CUSTOM03</td><td>CTSP</td><td>CUSTOM04</td><td>CUSTOM04</td></tr>
+  </table>
+
+  <h3>空運進口（CI）&mdash; 區外</h3>
+  <table>
+    <tr><th>欄位</th><th>桃園(預設)</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>CA</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>報單類型</td><td>G1</td><td>(空)</td><td>(空)</td><td>(空)</td><td>(空)</td></tr>
+    <tr><td>信箱</td><td>312</td><td>014</td><td>014</td><td>014</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>00671</td><td>00942</td><td>00942</td><td>00942</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM01</td><td>CUSTOM01</td><td>CUSTOM01</td><td>CUSTOM01</td><td>CUSTOM01</td></tr>
+    <tr><td>運輸方式</td><td>3</td><td>3</td><td>3</td><td>3</td><td>3</td></tr>
+  </table>
+
+  <h3>空運進口（CI）&mdash; 區內</h3>
+  <table>
+    <tr><th>欄位</th><th>全站預設</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>報單前綴</td><td>CB</td><td>CS</td><td>DS</td><td>BS</td><td>BS</td></tr>
+    <tr><td>報單類型</td><td>G1</td><td>B6</td><td>(空)</td><td>B6</td><td>B6</td></tr>
+    <tr><td>信箱</td><td>032</td><td>014</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>G0081</td><td>00942</td><td>00427</td><td>00801</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM02</td><td>CUSTOM03</td><td>CTSP</td><td>CUSTOM04</td><td>CUSTOM04</td></tr>
+  </table>
+
+  <h3>空運出口（CE）&mdash; 區外 / 區內</h3>
+  <table>
+    <tr><th>欄位</th><th>桃園(預設)</th><th>竹科</th><th>台中</th><th>台南</th><th>高雄</th></tr>
+    <tr><td>區外 信箱</td><td>014</td><td>014</td><td>014</td><td>014</td><td>312</td></tr>
+    <tr><td>區外 專責</td><td>00942</td><td>00942</td><td>00942</td><td>00942</td><td>00801</td></tr>
+    <tr><td>區內 報單前綴</td><td>CA</td><td>CS</td><td>DS</td><td>BS</td><td>BS</td></tr>
+    <tr><td>區內 信箱</td><td>580</td><td>014</td><td>194</td><td>312</td><td>312</td></tr>
+    <tr><td>區內 專責</td><td>00650</td><td>00942</td><td>00427</td><td>00801</td><td>00801</td></tr>
+  </table>
+
+  <h3>轉口（FT）&mdash; 僅高雄有設定</h3>
+  <table>
+    <tr><th>欄位</th><th>高雄</th></tr>
+    <tr><td>報單類型</td><td>T1</td></tr>
+    <tr><td>信箱</td><td>312</td></tr>
+    <tr><td>專責代碼</td><td>00801</td></tr>
+    <tr><td>通關網路</td><td>CUSTOM02</td></tr>
+    <tr><td>運輸方式</td><td>2</td></tr>
+  </table>
+
+  <div class="warning-box">
+    <strong>注意 — 專責人員停用問題</strong><br>
+    DB 顯示以下專責人員已停用，但 PLMPARM 預設值仍指向舊的代碼：
+    <ul>
+      <li><strong>014 站</strong>：張春蘭(00942) 已停用 &rarr; 現行有效為葉美如(01488)</li>
+      <li><strong>367 站</strong>：謝德忠(00653) 已停用 &rarr; 現行有效為杜爭紋(01487)</li>
+      <li><strong>310 站</strong>：李昭芬(00808) 已停用 &rarr; 現行有效為李錦蘋(00902)</li>
+    </ul>
+  </div>
+
+  <h3>共用預設欄位（所有業務別通用，~50 欄）</h3>
+  <table>
+    <tr><th>類別</th><th>欄位</th><th>預設值</th><th>說明</th></tr>
+    <tr><td rowspan="3"><strong>人員</strong></td><td>主辦/OP 人員</td><td>登入者</td><td>&mdash;</td></tr>
+    <tr><td>建立者姓名</td><td>登入者</td><td>&mdash;</td></tr>
+    <tr><td>分機</td><td>EMPLOYEE 表</td><td>&mdash;</td></tr>
+    <tr><td rowspan="2"><strong>日期</strong></td><td>報關/進口/出口日期</td><td>系統日期</td><td>&mdash;</td></tr>
+    <tr><td>建檔/報備日期時間</td><td>系統時間</td><td>&mdash;</td></tr>
+    <tr><td rowspan="2"><strong>金額</strong></td><td>匯率</td><td>1.00000</td><td>選幣別後自動查匯率覆寫</td></tr>
+    <tr><td>繳費方式</td><td>1（先放後稅）</td><td>客戶帶入後可能覆寫</td></tr>
+    <tr><td rowspan="3"><strong>旗標</strong></td><td>急件/預留/廠驗/冷庫/FreeHouse/異常/作廢</td><td>N</td><td>&mdash;</td></tr>
+    <tr><td>加班</td><td>X（無）</td><td>&mdash;</td></tr>
+    <tr><td>訊息別</td><td>9</td><td>&mdash;</td></tr>
+    <tr><td><strong>其他</strong></td><td>裝貨地點</td><td>桃園</td><td>台南/高雄站除外</td></tr>
+  </table>
+</div>
+
+<!-- ===== 卸存地點 ===== -->
+<div class="section">
+  <h2>三、卸存地點（貨物存放處所）自動帶入</h2>
+
+  <div class="highlight-box">
+    <strong>卸存地點 = 貨物在海關管轄範圍內的實際存放倉庫</strong><br>
+    建立報單時，系統會根據<strong>業務別（空/海運、進/出口、區內外）+ 關別代碼</strong>，自動帶入預設的卸存地點和裝卸貨港口。
+  </div>
+
+  <h3>帶入邏輯</h3>
+  <p>系統透過 PLMCA 表，以「業務別對應的 FLAG + 報單類型前綴」為 key，查出卸存地代碼和港口：</p>
+
+  <table>
+    <tr><th>步驟</th><th>動作</th><th>說明</th></tr>
+    <tr><td>1</td><td>業務別 &rarr; PLMCA FLAG</td><td>CE&rarr;A、CI&rarr;B、CT&rarr;C、FI&rarr;D、FE&rarr;E、FI區內&rarr;F、FE區內&rarr;S、CI轉運&rarr;T</td></tr>
+    <tr><td>2</td><td>FLAG + 關別代碼 &rarr; 查 PLMCA</td><td>取得 warehse_no（卸存地代碼）+ ship_port（港口）</td></tr>
+    <tr><td>3</td><td>warehse_no &rarr; 查 PLWHSNO</td><td>取得 warehse_name（卸存地名稱）</td></tr>
+  </table>
+
+  <h3>PLMCA FLAG 對應表（292 筆，8 種分類）</h3>
+  <table>
+    <tr><th>FLAG</th><th>業務別</th><th>關別數</th><th>有卸存地</th><th>有港口</th></tr>
+    <tr><td>A</td><td>空運出口（CE）</td><td class="center">35</td><td class="center">22</td><td class="center">16</td></tr>
+    <tr><td>B</td><td>空運進口（CI）/ 轉運進口</td><td class="center">34</td><td class="center">18</td><td class="center">7</td></tr>
+    <tr><td>C</td><td>轉運出口（CT）</td><td class="center">38</td><td class="center">4</td><td class="center">13</td></tr>
+    <tr><td>D</td><td>海運進口（FI）</td><td class="center">40</td><td class="center">6</td><td class="center">7</td></tr>
+    <tr><td>E</td><td>海運出口（FE）</td><td class="center">37</td><td class="center">22</td><td class="center">17</td></tr>
+    <tr><td>F</td><td>海運進口 — 區內（FI-S）</td><td class="center">28</td><td class="center">15</td><td class="center">7</td></tr>
+    <tr><td>S</td><td>海運出口 — 區內 / 轉運（FE-S）</td><td class="center">51</td><td class="center">12</td><td class="center">0</td></tr>
+    <tr><td>T</td><td>空運進口 — 轉運（CI-T）</td><td class="center">29</td><td class="center">16</td><td class="center">0</td></tr>
+  </table>
+
+  <h3>主要關別 &rarr; 卸存地對應範例</h3>
+  <table>
+    <tr><th>關別</th><th>說明</th><th>卸存地代碼</th><th>港口</th></tr>
+    <tr><td>CA（空運出口）</td><td>華儲出口貨棧</td><td>C2002</td><td>TWTYN</td></tr>
+    <tr><td>CG（空運出口）</td><td>長榮空運出口貨棧</td><td>C2030</td><td>TWTYN</td></tr>
+    <tr><td>CW（空運出口）</td><td>遠雄空運出口貨棧</td><td>C2036</td><td>TWTYN</td></tr>
+    <tr><td>CR（空運出口）</td><td>DHL 出口快遞倉</td><td>C2027</td><td>TWTYN</td></tr>
+    <tr><td>CU（空運出口）</td><td>UPS 出口</td><td>C2014</td><td>TWTYN</td></tr>
+    <tr><td>CS（空運/區內）</td><td>新竹科學工業園區支所</td><td>C2006 / C2005</td><td>&mdash;</td></tr>
+    <tr><td>BF（高雄空運）</td><td>高雄機場分局</td><td>B2141</td><td>TWKHH</td></tr>
+    <tr><td>BS（台南區內）</td><td>台南科學工業園區支所</td><td>B2A10 / B2A11</td><td>&mdash;</td></tr>
+  </table>
+
+  <h3>近一年使用量最高的卸存地 Top 10</h3>
+  <table>
+    <tr><th>卸存地代碼</th><th>名稱</th><th>近一年筆數</th></tr>
+    <tr><td>003C2036</td><td>桃園遠雄出口</td><td class="num">55,345</td></tr>
+    <tr><td>003C2001</td><td>桃園華儲進口</td><td class="num">25,945</td></tr>
+    <tr><td>003C2002</td><td>桃園華儲出口</td><td class="num">20,019</td></tr>
+    <tr><td>TXG037DS</td><td>引春自由貿易港區</td><td class="num">19,379</td></tr>
+    <tr><td>018C2006</td><td>新竹儲運出口</td><td class="num">17,792</td></tr>
+    <tr><td>003C2029</td><td>桃園榮儲進口</td><td class="num">17,355</td></tr>
+    <tr><td>680C2052</td><td>桃園大園加值園區 B1 港區</td><td class="num">15,764</td></tr>
+    <tr><td>000ZZZZZ</td><td>按月彙報</td><td class="num">11,749</td></tr>
+    <tr><td>000DZZZZ</td><td>未經海關登記空貨櫃儲存處</td><td class="num">9,773</td></tr>
+    <tr><td>018C2005</td><td>新竹儲運進口</td><td class="num">7,931</td></tr>
+  </table>
+
+  <h3>卸存地的異動觸發點</h3>
+  <table>
+    <tr><th>觸發時機</th><th>行為</th></tr>
+    <tr><td>建立新報單</td><td>根據 DEP + 報單類型前綴，從 PLMCA 自動帶入卸存地 + 港口</td></tr>
+    <tr><td>變更關別（BOX_NO）</td><td>重新查 PLMCA，更新卸存地 + 港口</td></tr>
+    <tr><td>變更關別代碼</td><td>關別代碼（如 CA）&rarr; 查 PLMCA 找到卸存地（如 C2002）&rarr; 查 PLWHSNO 帶入名稱 &rarr; 更新提貨地</td></tr>
+    <tr><td>OP 手動變更卸存地</td><td>直接從 PLWHSNO 帶入名稱 &rarr; 更新提貨地</td></tr>
+    <tr><td>園區通關模式</td><td>查 PLWHSNO 以 AIR_SEA + FILER 取得不同的卸存地</td></tr>
+  </table>
+
+  <div class="warning-box">
+    <strong>現況限制</strong>：目前卸存地的自動帶入<strong>完全以關別代碼為依據，不會依客戶變化</strong>。同一個關別（如 CA），不管客戶是台積電還是美光，系統帶入的卸存地都一樣。OP 必須每次手動修改為正確的倉庫。<br>
+    客戶偏好分析詳見第四章。
+  </div>
+
+  <div class="orange-box">
+    <strong>UX 設計注意事項</strong>：
+    <ul>
+      <li>卸存地 dropdown 內容需<strong>依業務別（空/海運 &times; 進/出口 &times; 區內外）動態篩選</strong>，不能全部混在一起（292 筆 &times; 8 種分類）</li>
+      <li>PLWHSNO 卸存地代碼有<strong>兩種長度格式</strong>：5 碼（如 C2036）和 8 碼（如 003C2036，前 3 碼為關區代碼）。報單存的是 8 碼，PLMCA 裡有些是 5 碼 — 需確認對應規則</li>
+      <li>特殊值 <code>ZZZZZ</code>（旅客行李）和 <code>000ZZZZZ</code>（按月彙報）不是實際倉庫，是虛擬卸存地代碼</li>
+      <li>進口和出口<strong>同一個關別</strong>（如 CA）對應<strong>不同的卸存地</strong>（進口=C2001 華儲進口倉、出口=C2002 華儲出口倉）</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== 客戶偏好分析 ===== -->
+<div class="section">
+  <h2>四、客戶偏好自動帶入 — 數據分析</h2>
+
+  <div class="warning-box">
+    <strong>現況問題</strong>：LRP 在建單時，以下 5 個欄位只會帶入「通用預設值」（依關別或固定值），<strong>不會根據客戶自動帶入</strong>。但從近一年報單資料分析，客戶對這些欄位有非常明確的偏好 — 如果自動帶入客戶最常用的值，大量報單根本不需要 OP 手動修改。
+  </div>
+
+  <h3>5 個欄位的客戶偏好命中率</h3>
+  <p>統計方式：取每位客戶近一年（2025/04~2026/04）使用最頻繁的值（top-1），計算該值佔該客戶全部報單的比例。僅統計報單數 &ge; 10 筆的活躍客戶。</p>
+
+  <table>
+    <tr><th>欄位</th><th>說明</th><th>LRP 現行預設來源</th><th>客戶 top-1<br>平均命中率</th><th>中位數</th><th>活躍客戶數</th></tr>
+    <tr><td><strong>裝貨地點</strong><br>(from_port)</td><td>貨物的裝載地</td><td>固定值「桃園」<br>（台南/高雄除外）</td><td class="center" style="color:var(--success);font-weight:700">96.0%</td><td class="center">100%</td><td class="center">139</td></tr>
+    <tr><td><strong>幣別</strong><br>(curr_code)</td><td>交易幣別</td><td>僅 CI 從 PLMPARM 帶<br>其他業務別無預設</td><td class="center" style="color:var(--success);font-weight:700">90.7%</td><td class="center">100%</td><td class="center">581</td></tr>
+    <tr><td><strong>貿易條件</strong><br>(terms)</td><td>CIF/FOB/EXW 等</td><td>僅 CI 從 PLMPARM 帶<br>其他業務別無預設</td><td class="center" style="color:var(--primary);font-weight:700">82.3%</td><td class="center">90.2%</td><td class="center">581</td></tr>
+    <tr><td><strong>裝卸貨港口</strong><br>(ship_port)</td><td>起運/目的港口</td><td>從 PLMCA 帶<br>（依關別，不看客戶）</td><td class="center" style="color:var(--primary);font-weight:700">74.6%</td><td class="center">83.2%</td><td class="center">588</td></tr>
+    <tr><td><strong>卸存地</strong><br>(warehse_no)</td><td>貨物存放處所</td><td>從 PLMCA 帶<br>（依關別，不看客戶）</td><td class="center" style="font-weight:700">67.1%</td><td class="center">66.7%</td><td class="center">585</td></tr>
+  </table>
+
+  <h3>為什麼 LRP 沒做？</h3>
+  <p>確認過客戶主檔（CUSTOM 表）和客戶部門設定（CUSTDEP 表），<strong>這 5 個欄位都不存在</strong>。LRP 從來沒有設計「依客戶帶入」的機制，OP 只能每次手動選。</p>
+
+  <h3>實際影響範例</h3>
+  <table>
+    <tr><th>客戶</th><th>近一年報單數</th><th>使用了幾個不同卸存地</th><th>OP 每張單都要手動選</th></tr>
+    <tr><td>台積電(A098/B001/C070)</td><td class="num">32,039</td><td class="center">83 / 65 / 57</td><td>是（無法自動帶入）</td></tr>
+    <tr><td>啟碁科技(B523)</td><td class="num">2,442</td><td class="center">51</td><td>是</td></tr>
+    <tr><td>緯穎(B666)</td><td class="num">3,973</td><td class="center">45</td><td>是</td></tr>
+    <tr><td>美光(C095)</td><td class="num">2,130</td><td class="center">44</td><td>是</td></tr>
+    <tr><td>康寧(C030)</td><td class="num">3,341</td><td class="center">37</td><td>是</td></tr>
+    <tr><td>金士頓(A353)</td><td class="num">9,700</td><td class="center">37</td><td>是</td></tr>
+  </table>
+
+  <div class="success-box">
+    <strong>新系統 UX 優化建議</strong>：在客戶主檔新增這 5 個欄位的「預設值」設定（可依業務別分組），選擇客戶時自動帶入。<br>
+    <ul>
+      <li><strong>裝貨地點</strong>、<strong>幣別</strong>：命中率 90%+，自動帶入幾乎不需要改</li>
+      <li><strong>貿易條件</strong>：命中率 82%，大幅減少手動選取</li>
+      <li><strong>裝卸貨港口</strong>、<strong>卸存地</strong>：命中率 67~75%，大客戶可能需要更細的維度（如客戶 &times; 業務別 &times; 站別）</li>
+    </ul>
+    進階做法（再評估）：未來可考慮系統自動從歷史報單統計客戶偏好作為建議值，具體實施方式待評估。
+  </div>
+</div>
+
+<!-- ===== 五、通關網路 ===== -->
+<div class="section">
+  <h2>五、通關網路（TRADEPTNER）</h2>
+
+  <div class="highlight-box">
+    <strong>通關網路 = EDI 傳輸路由</strong><br>
+    這個欄位決定「這張報單要走哪條線路、用哪個郵箱帳號送去海關」。<br>
+    背後連接的是<strong>關貿網路（TRADEVAN）</strong>的不同郵箱，每個郵箱對應不同的站別和空/海運。
+  </div>
+
+  <h3>通關網路代碼與對應</h3>
+  <table>
+    <tr><th>代碼</th><th>說明</th><th>對應郵箱範例</th><th>近一年報單數</th></tr>
+    <tr><td><code>CUSTOM01</code></td><td>空運</td><td>PBK2309（台北014空）</td><td class="num">~210 萬</td></tr>
+    <tr><td><code>CUSTOM02</code></td><td>海運</td><td>ASE0340（台北014海）</td><td class="num">~43 萬</td></tr>
+    <tr><td><code>CUSTOM03</code></td><td>竹科專用</td><td>S0910（竹科014）</td><td class="num">~102 萬</td></tr>
+    <tr><td><code>CUSTOM04</code></td><td>台南/高雄區內</td><td>T0014（台南312）</td><td class="num">~24 萬</td></tr>
+    <tr><td><code>CTSP</code></td><td>中科空運(194)</td><td>U0801（中科194）</td><td class="num">~6.7 萬</td></tr>
+    <tr><td><code>SBIP367</code></td><td>竹科空運(367)</td><td>S0768（竹科367）</td><td class="num">~2,000</td></tr>
+  </table>
+
+  <h3>相關 DB 表</h3>
+  <table>
+    <tr><th>表名</th><th>說明</th><th>相關欄位</th></tr>
+    <tr><td><code>PLMUNT</code> FLAG='K'</td><td>通關網路碼表（19 筆）</td><td>fld_no = 代碼、descp = 說明</td></tr>
+    <tr><td><code>TVMBOX</code></td><td>郵箱帳號設定（15 筆）</td><td>box_no、van_no、box_pw、dep（空/海）、sciarea_yn</td></tr>
+    <tr><td><code>TVSNDID</code></td><td>專責人員 EDI 傳送身份（22 筆）</td><td>sndid、box_no、licence、invalid_flag</td></tr>
+  </table>
+
+  <h3>郵箱帳號明細（TVMBOX）</h3>
+  <table>
+    <tr><th>簡稱</th><th>信箱</th><th>郵箱代碼</th><th>空/海</th><th>區內外</th></tr>
+    <tr><td>台北-014空</td><td>014</td><td>PBK2309</td><td>空運</td><td>區外</td></tr>
+    <tr><td>台北-014海</td><td>014</td><td>ASE0340</td><td>海運</td><td>區外</td></tr>
+    <tr><td>台中-194空</td><td>194</td><td>AAE0434</td><td>空運</td><td>區外</td></tr>
+    <tr><td>台中-194海</td><td>194</td><td>ASE0176</td><td>海運</td><td>區外</td></tr>
+    <tr><td>高雄-312空</td><td>312</td><td>PBK4640</td><td>空運</td><td>區外</td></tr>
+    <tr><td>高雄-312海</td><td>312</td><td>PKH6428</td><td>海運</td><td>區外</td></tr>
+    <tr><td>基隆-543海</td><td>543</td><td>ASE0315</td><td>海運</td><td>區外</td></tr>
+    <tr><td>DHL</td><td>&mdash;</td><td>PBK0013</td><td>空運</td><td>區外</td></tr>
+    <tr><td>竹科-014</td><td>014</td><td>S0910</td><td>&mdash;</td><td>區內</td></tr>
+    <tr><td>竹科-367</td><td>367</td><td>S0768</td><td>&mdash;</td><td>區內</td></tr>
+    <tr><td>中科-194</td><td>194</td><td>U0801</td><td>&mdash;</td><td>區內</td></tr>
+    <tr><td>台南-312</td><td>312</td><td>T0014</td><td>&mdash;</td><td>區內</td></tr>
+    <tr><td>台南-310</td><td>310</td><td>T0038</td><td>&mdash;</td><td>區內</td></tr>
+  </table>
+</div>
+
+<!-- ===== 四、運輸方式碼 ===== -->
+<div class="section">
+  <h2>六、運輸方式碼（TPT_MODE）— 新舊格式並存</h2>
+
+  <p>運輸方式碼在 2015~2016 年間從 <strong>1 碼（舊）</strong>切換為<strong> 2 碼（新/關港貿 CPT 格式）</strong>。2017 年後幾乎全面使用 2 碼。</p>
+
+  <h3>新舊碼對照表</h3>
+  <table>
+    <tr><th>2 碼（新）</th><th>說明</th><th>1 碼（舊）</th><th>近一年筆數</th></tr>
+    <tr><td><code>41</code></td><td>空運非快遞</td><td>3</td><td class="num">162,502</td></tr>
+    <tr><td><code>99</code></td><td>其他（含國內/自貿區）</td><td>5</td><td class="num">62,448</td></tr>
+    <tr><td><code>42</code></td><td>空運快遞</td><td>3</td><td class="num">23,858</td></tr>
+    <tr><td><code>12</code></td><td>海運貨櫃</td><td>2</td><td class="num">16,081</td></tr>
+    <tr><td><code>11</code></td><td>海運非貨櫃（有包裝）</td><td>1</td><td class="num">2,584</td></tr>
+    <tr><td><code>13</code></td><td>海運非貨櫃（無包裝散貨）</td><td>6</td><td class="num">1,808</td></tr>
+    <tr><td><code>44</code></td><td>空運旅客攜帶</td><td>3</td><td class="num">103</td></tr>
+    <tr><td><code>51</code></td><td>海運郵包</td><td>1</td><td class="num">16</td></tr>
+    <tr><td><code>52</code></td><td>空運郵包</td><td>3</td><td class="num">9</td></tr>
+  </table>
+
+  <h3>切換歷程</h3>
+  <table>
+    <tr><th>年份</th><th>1 碼筆數</th><th>2 碼筆數</th><th>說明</th></tr>
+    <tr><td>2014</td><td class="num">217,584</td><td class="num">2,359</td><td>2 碼開始出現</td></tr>
+    <tr><td>2015</td><td class="num">157,474</td><td class="num">48,292</td><td>過渡期</td></tr>
+    <tr><td>2016</td><td class="num">32,049</td><td class="num">177,232</td><td><strong>2 碼成為主流</strong></td></tr>
+    <tr><td>2017</td><td class="num">82</td><td class="num">209,952</td><td>切換完成</td></tr>
+    <tr><td>2025</td><td class="num">133</td><td class="num">268,362</td><td>1 碼僅剩極少例外</td></tr>
+  </table>
+
+  <div class="highlight-box">
+    <strong>重要發現</strong>：2 碼運輸方式碼<strong>不限於區內/園區通關</strong>。近一年資料顯示，區外報單也大量使用 2 碼（例如 41 空運非快遞有 14.2 萬筆區外、12 海運貨櫃有 1.6 萬筆區外）。<br><br>
+    <strong>PLMPARM 預設值差異</strong>：一般模式（FI01 等）預設 1 碼（2 或 3），園區通關模式（CPTFI 等）預設 2 碼（12 或 41）。但實務上 2017 年後所有報單都已改用 2 碼。
+  </div>
+
+  <h3>1 碼仍在使用的場景</h3>
+  <p>LRP 在費用匹配（帳單設定 CUSTBILLTO）和運輸帳單處理時，仍會先用 <code>Trans_TPT_MODE_to_OLD()</code> 將 2 碼轉回 1 碼，因為帳單對照表尚未更新為 2 碼格式。</p>
+</div>
+
+<!-- ===== 五、費用矩陣 ===== -->
+<div class="section">
+  <h2>七、費用自動產生</h2>
+
+  <h3>費用矩陣</h3>
+  <table>
+    <tr><th>費用碼</th><th>費用名稱</th><th>CT<br>轉運</th><th>FT<br>卡車</th><th>FI<br>區外</th><th>FI<br>區內</th><th>FE<br>區外</th><th>FE<br>區內</th><th>CI<br>區外</th><th>CI<br>區內</th><th>CE<br>區外</th><th>CE<br>區內</th></tr>
+    <tr><td>D101</td><td>轉口報關費</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>D101A</td><td>轉口報關費</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>D102</td><td>報關費</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td></tr>
+    <tr><td>D104</td><td>EDI 傳送費</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td></tr>
+    <tr><td>D109</td><td>理貨費(空運)</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>D109A</td><td>理貨費(CFS)</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>D112</td><td>加頁費(qty=0)</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td></tr>
+    <tr><td>T101</td><td>聯合運費</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="check">V</td><td class="dash">&mdash;</td><td class="check">V</td><td class="check">V</td></tr>
+    <tr><td>T102</td><td>園區送貨費</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="center">V*</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="center">V*</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>1005</td><td>貨櫃到場運費</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>1006</td><td>貨櫃起步運費</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td></tr>
+    <tr><td>1008</td><td>園區到場(代)</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="check">V</td><td class="dash">&mdash;</td><td class="check">V</td></tr>
+  </table>
+  <p class="footnote">*T102 僅在非新版計費站別時產生</p>
+
+  <h3>動態調整費用</h3>
+  <table>
+    <tr><th>觸發條件</th><th>費用碼</th><th>動作</th></tr>
+    <tr><td>勾選「副本報單」</td><td>D211</td><td>新增</td></tr>
+    <tr><td>有簽證</td><td>D212</td><td>新增</td></tr>
+    <tr><td>高科技 + 有簽證</td><td>D214</td><td>新增</td></tr>
+    <tr><td>出口 + 勾選「貼紙標」</td><td>D220</td><td>新增</td></tr>
+    <tr><td>客運導入代辦</td><td>D106</td><td>新增（取代 D102）</td></tr>
+    <tr><td>裝運方式 CFS/CY 切換</td><td>D109A/D109B</td><td>互換</td></tr>
+  </table>
+</div>
+
+<!-- ===== 六、項次預設 ===== -->
+<div class="section">
+  <h2>八、項次預設值</h2>
+  <p>新增報單項次時，自動從表頭帶入：</p>
+  <table>
+    <tr><th>項次欄位</th><th>預設來源</th><th>說明</th></tr>
+    <tr><td>生產國別</td><td>表頭的買方國碼</td><td>僅進口</td></tr>
+    <tr><td>貿易條件</td><td>表頭的貿易條件</td><td>&mdash;</td></tr>
+    <tr><td>幣別</td><td>表頭的幣別</td><td>&mdash;</td></tr>
+    <tr><td>匯率</td><td>表頭的匯率</td><td>&mdash;</td></tr>
+    <tr><td>簽審文號</td><td>表頭的進/出口許可證號</td><td>&mdash;</td></tr>
+    <tr><td>序號</td><td>自動遞增</td><td>&mdash;</td></tr>
+    <tr><td>各旗標</td><td>全部 N</td><td>復運/營業稅/低價/繳稅/原產地/免稅</td></tr>
+  </table>
+</div>
+
+<!-- ===== 七、連動規則 ===== -->
+<div class="section">
+  <h2>九、欄位變更連動規則</h2>
+
+  <h3>9.1 報單類別變更</h3>
+  <table>
+    <tr><th>報單類別</th><th>連動行為</th></tr>
+    <tr><td>F2、F3（自貿區）</td><td>信箱強制改 <strong>543</strong> / 運輸方式強制改 <strong>99</strong> / 自貿區旗標強制勾選</td></tr>
+    <tr><td>其他自貿區類別</td><td>自貿區 checkbox 啟用</td></tr>
+  </table>
+
+  <h3>9.2 關別（信箱）變更</h3>
+  <table>
+    <tr><th>連動欄位</th><th>說明</th></tr>
+    <tr><td>專責人員</td><td>從 TVSNDID 表用新信箱查最新有效(invalid_flag=N)的專責代碼</td></tr>
+    <tr><td>報單號碼</td><td>更新號碼結構中的信箱碼 + 進/出口標記</td></tr>
+    <tr><td>包裝描述</td><td>如已有客戶，用新信箱查客戶的包裝描述（CUSTDEP 表，6,264 筆）</td></tr>
+  </table>
+
+  <h3>9.3 運輸方式變更（國內 TPT_MODE=5/99）</h3>
+  <table>
+    <tr><th>連動欄位</th><th>值</th></tr>
+    <tr><td>複查類別</td><td>= 報單類別</td></tr>
+    <tr><td>出口口岸</td><td>= 台灣港口代碼</td></tr>
+    <tr><td>幣別/航線</td><td>清空</td></tr>
+    <tr><td>賣方國碼</td><td>= 台灣</td></tr>
+  </table>
+
+  <h3>9.4 關別代碼 &rarr; 卸存地 &rarr; 提貨地 連鎖</h3>
+  <p>OP 輸入或變更關別代碼（如 CA、CS、BF）後，系統自動執行三步：</p>
+  <table>
+    <tr><th>步驟</th><th>動作</th><th>範例（關別代碼 = CA）</th></tr>
+    <tr><td>1</td><td>用關別代碼查 PLMCA 表</td><td>CA &rarr; 卸存地 C2002 + 港口 TWTYN</td></tr>
+    <tr><td>2</td><td>用卸存地代碼查 PLWHSNO 表</td><td>C2002 &rarr;「華儲出口貨棧」</td></tr>
+    <tr><td>3</td><td>更新所有提貨地資料</td><td>提貨地的港口 / 港名 / 公司全部同步更新</td></tr>
+  </table>
+
+  <h3>9.5 業務別（DEP）切換</h3>
+  <table>
+    <tr><th>連動欄位</th><th>說明</th></tr>
+    <tr><td>主提單格式</td><td>海運 = <code>ccc-99999999</code>，空運 = 自由格式</td></tr>
+    <tr><td>報單號碼長度</td><td>海運 = 4 碼流水號，空運 = 5 碼</td></tr>
+  </table>
+</div>
+
+<!-- ===== 八、轉口 ===== -->
+<div class="section">
+  <h2>十、轉口報單（CT/FT）特殊規則</h2>
+  <table>
+    <tr><th>差異</th><th>說明</th></tr>
+    <tr><td>多 5 個日期欄位</td><td>實際轉運日/預計結關日/預計到貨日/預計結關時間/預計到貨時間</td></tr>
+    <tr><td>預計時間預設 0000</td><td>&mdash;</td></tr>
+    <tr><td>CT 客戶第一碼 &rarr; 到站別</td><td>A &rarr; CS(竹科) / B &rarr; BS(南科) / C &rarr; DS(中科)</td></tr>
+    <tr><td>CT 空運公司自動帶入</td><td>長榮=82065 / 洋基DHL=82178 / UPS=82096 / FEDEX=82034 / 五洲=21862 / 暢通=82227</td></tr>
+  </table>
+</div>
+
+<!-- ===== 九、DB 來源 ===== -->
+<div class="section">
+  <h2>十一、相關 DB 表索引</h2>
+  <table>
+    <tr><th>表名</th><th>說明</th><th>用途</th></tr>
+    <tr><td><code>PLMPARM</code></td><td>建單參數表（82 筆）</td><td>PARA_CODE + STATION &rarr; PARA_VALUE 預設值字串</td></tr>
+    <tr><td><code>PLMUNT</code> FLAG='B'</td><td>信箱（箱號）碼表（17 筆）</td><td>信箱代碼 &rarr; 報關行名稱</td></tr>
+    <tr><td><code>PLMUNT</code> FLAG='L'</td><td>專責人員碼表（19 筆）</td><td>專責代碼 &rarr; 人名</td></tr>
+    <tr><td><code>PLMUNT</code> FLAG='K'</td><td>通關網路碼表（19 筆）</td><td>代碼 &rarr; 說明</td></tr>
+    <tr><td><code>PLMUNT</code> FLAG='MC'</td><td>運輸方式碼表（12 筆）</td><td>2 碼 &rarr; 說明</td></tr>
+    <tr><td><code>TVMBOX</code></td><td>EDI 郵箱帳號設定（15 筆）</td><td>站別×空海 &rarr; TRADEVAN 郵箱代碼/密碼</td></tr>
+    <tr><td><code>TVSNDID</code></td><td>專責人員 EDI 傳送身份（22 筆）</td><td>信箱×專責代碼 &rarr; SNDID + 有效/停用狀態</td></tr>
+    <tr><td><code>PLMCA</code></td><td>關別 &rarr; 倉庫 + 出口岸（~200 筆）</td><td>FLAG A~T 共 7 種分類</td></tr>
+    <tr><td><code>PLWHSNO</code></td><td>倉庫主檔（~200 筆）</td><td>倉庫代碼 &rarr; 名稱/站別/所屬關區</td></tr>
+    <tr><td><code>CUSTDEP</code></td><td>客戶部門設定（6,264 筆）</td><td>客戶×站別 &rarr; 繳稅方式/包裝描述/專案文號</td></tr>
+  </table>
+</div>
+</div>
+
+<div id="tab-optimize" class="tab-content tab-optimize">
+<div class="meta">
+    <span>2026-04-15</span>
+    <span>新系統報關模組</span>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="section">
+  <h2>優化總覽</h2>
+  <p>以下為 LRP 現行報單建立自動化規則與 新系統設計的交叉比對結果，分為三類：</p>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num green">~25 項</div><div class="label">必須保留的業務邏輯</div></div>
+    <div class="stat-card"><div class="num orange">~15 項</div><div class="label">可優化 / 不應盲遷</div></div>
+    <div class="stat-card"><div class="num blue">~18 項</div><div class="label">新系統已有更好設計</div></div>
+  </div>
+</div>
+
+<!-- 一、參數儲存 -->
+<div class="section">
+  <h2>一、參數儲存方式現代化</h2>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP 現行做法</h4>
+      <p>82 筆系統參數，每筆是一個 <strong>65~82 字元的固定位置字串</strong>：</p>
+      <p><code>BSB6310000725CUSTOM02  CTN2YYY180...</code></p>
+      <p>位置 1-2 = 報單前綴、3-4 = 報單類型、5-7 = 信箱、8 = 附碼、9-13 = 專責代碼... 每個業務別的偏移量還不一樣（CI 比 FI 多偏移 10 位）。</p>
+      <p>修改參數需要精準計算字元位置，極易出錯。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統建議做法</h4>
+      <p>建立結構化的 <strong>站別預設設定表</strong>，每個欄位獨立存放：</p>
+      <ul>
+        <li>欄位名稱語意明確（<code>boxNo</code>、<code>licenceNo</code>、<code>tradepartner</code>）</li>
+        <li>管理介面可直接編輯，不需計算位置</li>
+        <li>新增站別只需加一筆設定，不需改程式</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>園區通關（CPT）整併</h3>
+  <p>LRP 為園區通關維護了額外 16 筆參數（CPTFI/CPTFIS/CPTFE...），但 CPT 與一般模式的差異<strong>只有三點</strong>：</p>
+  <ol>
+    <li>運輸方式碼 2 碼（如 <code>41</code>）vs 1 碼（如 <code>3</code>）</li>
+    <li>報單號碼格式微調（加信箱 + I/E 後綴）</li>
+    <li>少數參數值不同</li>
+  </ol>
+  <div class="success-box">
+    <strong>建議</strong>：不需獨立參數集。用 <code>zoneType</code>（一般 / 科學園區 / 自貿區）控制差異，運輸方式碼的轉換由 EDI Serializer 處理。可減少 16 筆重複設定。
+  </div>
+</div>
+
+<!-- 二、客戶偏好 -->
+<div class="section">
+  <h2>二、客戶偏好自動帶入（數據驅動新功能）</h2>
+
+  <div class="highlight-box">
+    <strong>核心發現</strong>：LRP 在建單時有 5 個欄位只帶「通用預設值」，不會根據客戶帶入。但近一年報單資料分析顯示，客戶對這些欄位有非常明確的偏好。如果自動帶入客戶最常用的值，<strong>平均 67%~96% 的報單不需要 OP 手動修改</strong>。
+  </div>
+
+  <table>
+    <tr><th>欄位</th><th>LRP 現行</th><th>客戶 top-1 命中率</th><th>新系統建議</th></tr>
+    <tr><td><strong>裝貨地點</strong></td><td>固定「桃園」</td><td style="color:var(--success);font-weight:700">96.0%</td><td>客戶主檔設定預設裝貨地</td></tr>
+    <tr><td><strong>幣別</strong></td><td>僅 CI 有預設</td><td style="color:var(--success);font-weight:700">90.7%</td><td>客戶主檔設定預設幣別</td></tr>
+    <tr><td><strong>貿易條件</strong></td><td>僅 CI 有預設</td><td style="font-weight:700">82.3%</td><td>客戶主檔設定預設條件</td></tr>
+    <tr><td><strong>裝卸貨港口</strong></td><td>依關別帶入</td><td style="font-weight:700">74.6%</td><td>客戶 &times; 業務別設定</td></tr>
+    <tr><td><strong>卸存地</strong></td><td>依關別帶入</td><td style="font-weight:700">67.1%</td><td>客戶 &times; 業務別 &times; 站別設定</td></tr>
+  </table>
+
+  <p>確認過 LRP 的客戶主檔（CUSTOM 表）和客戶部門設定（CUSTDEP 表），<strong>這 5 個欄位都不存在</strong> — LRP 從來沒有設計這個功能。</p>
+
+  <h3>實施方式建議</h3>
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>方案 A：手動設定</h4>
+      <p>在客戶主檔新增這 5 個欄位，由管理員手動設定每位客戶的預設值。</p>
+      <p>優點：簡單、可控。缺點：需要人工維護，大客戶多廠區可能不夠用。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>方案 B：歷史學習</h4>
+      <p>系統自動從歷史報單統計客戶偏好，建單時帶入最常用的值。無需手動設定。</p>
+      <p>優點：零維護成本、自動適應。缺點：新客戶沒歷史資料、實施方式待評估。</p>
+    </div>
+  </div>
+
+  <div class="success-box">
+    <strong>建議</strong>：先做方案 A（客戶主檔設定預設值），這已能覆蓋大部分場景。方案 B（歷史學習）作為未來進階功能，具體實施方式再評估。
+  </div>
+</div>
+
+<!-- 三、運輸方式碼 -->
+<div class="section">
+  <h2>三、運輸方式碼統一為 2 碼</h2>
+<!-- renumber done: 二=客戶偏好, 三=運輸方式, 四=費用, 五=連動, 六=轉口, 七=通關網路, 八=共用預設 -->
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP 現行做法</h4>
+      <p>1 碼（舊格式，2015 年前）和 2 碼（新關港貿格式）<strong>並存</strong>。</p>
+      <p>PLMPARM 一般模式預設 1 碼，CPT 模式預設 2 碼。費用匹配時用 <code>Trans_TPT_MODE_to_OLD()</code> 把 2 碼轉回 1 碼，因為帳單對照表還沒更新。</p>
+      <p>DB 實際情況：2017 年後全面使用 2 碼（年 27 萬筆），1 碼僅剩每年 ~133 筆例外。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統建議做法</h4>
+      <ul>
+        <li>DB 欄位<strong>一律存 2 碼</strong>（41/42/12/11/99 等，官方 EDI 標準）</li>
+        <li>帳單費用對照表一併升級為 2 碼，<strong>移除 1→2 碼轉換邏輯</strong></li>
+        <li>UI dropdown 直接使用碼表的 12 個 2 碼值</li>
+        <li>資料遷移時保留轉換對照表作為參考</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>新舊碼對照（主要使用的 5 碼）</h3>
+  <table>
+    <tr><th>2 碼</th><th>說明</th><th>舊 1 碼</th><th>近一年筆數</th></tr>
+    <tr><td><code>41</code></td><td>空運非快遞</td><td>3</td><td style="text-align:right">162,502</td></tr>
+    <tr><td><code>99</code></td><td>其他（含國內/自貿區）</td><td>5</td><td style="text-align:right">62,448</td></tr>
+    <tr><td><code>42</code></td><td>空運快遞</td><td>3</td><td style="text-align:right">23,858</td></tr>
+    <tr><td><code>12</code></td><td>海運貨櫃</td><td>2</td><td style="text-align:right">16,081</td></tr>
+    <tr><td><code>11</code></td><td>海運非貨櫃</td><td>1</td><td style="text-align:right">2,584</td></tr>
+  </table>
+
+  <div class="success-box">
+    <strong>效益</strong>：移除 1 碼/2 碼雙軌邏輯和 <code>Trans_TPT_MODE_to_OLD()</code> 轉換函式，消除一個歷史相容性負擔。但需要確認帳單費用對照表（CUSTBILLTO）是否一併從 1 碼升級為 2 碼。
+  </div>
+</div>
+
+<!-- 三、費用 -->
+<div class="section">
+  <h2>四、費用自動產生可設定化</h2>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP 現行做法</h4>
+      <p>12 個費用碼的產生矩陣 <strong>hardcode 在程式碼中</strong>（PUB_PROC 第 432~530 行）。新增或移除費用碼需要修改 Delphi 原始碼並重新編譯部署。</p>
+      <p>動態調整規則（副本→D211、簽證→D212 等）分散在另一個 procedure 裡。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統建議做法</h4>
+      <p>建立<strong>費用模板設定表</strong>：</p>
+      <ul>
+        <li>業務別 &times; 區內外 &rarr; 費用碼清單（靜態模板）</li>
+        <li>觸發條件 &rarr; 新增/移除費用碼（動態規則）</li>
+        <li>統一在管理介面維護，不需改程式</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>可移除的歷史邏輯</h3>
+  <table>
+    <tr><th>項目</th><th>說明</th></tr>
+    <tr><td>T102 園區送貨費的「新版 vs 舊版計費站別」判斷</td><td>LRP 歷史殘留，兩套計費切換邏輯。新系統應統一為單一計費模式</td></tr>
+    <tr><td>D109A / D109B CFS&harr;CY 互斥切換散在不同 procedure</td><td>合併到費用模板的條件規則中統一管理</td></tr>
+  </table>
+</div>
+
+<!-- 三、連動規則 -->
+<div class="section">
+  <h2>五、欄位連動規則簡化</h2>
+
+  <h3>3.1 自貿區 F2/F3 強制信箱 543 — 可移除</h3>
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP 現行做法</h4>
+      <p>報單類別選 F2/F3 時，<strong>強制</strong>將信箱改為 543（基隆關）、運輸方式改為 99。</p>
+      <p>這是因為 LRP 的報單取號使用「信箱 543 + A 後綴」來區分自貿區報單號碼，避免與一般報單撞號。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統建議做法</h4>
+      <p>報單取號優化方案已解決 A72 號碼衝突問題（流水號自動計算長度），<strong>自貿區報單可使用真實信箱</strong>，不需強制改 543。</p>
+      <p>運輸方式 99（國內）仍保留，這是海關要求。</p>
+    </div>
+  </div>
+
+  <h3>3.2 關別代碼 &rarr; 卸存地 &rarr; 提貨地 連鎖 — 可簡化</h3>
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP：三步連鎖</h4>
+      <p>OP 輸入關別代碼（如 CA）&rarr; 系統查 PLMCA 找到卸存地（如 C2002 華儲）&rarr; 再查 PLWHSNO 帶入倉庫名稱 &rarr; 更新提貨地</p>
+      <p>OP 不能直接選卸存地，必須先輸入關別代碼才能間接帶出。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統：直接選卸存地</h4>
+      <p>新系統 UI 可直接提供<strong>卸存地下拉選單</strong>（依業務別動態篩選），簡化為：</p>
+      <p><strong>選卸存地 &rarr; 帶入名稱 + 更新提貨地</strong></p>
+      <p>關別代碼作為獨立欄位，不再觸發連鎖。</p>
+    </div>
+  </div>
+
+  <h3>3.3 必須保留的連動</h3>
+  <table>
+    <tr><th>規則</th><th>保留原因</th></tr>
+    <tr><td>關別(BOX_NO)變更 &rarr; 重查專責人員</td><td>法規要求：不同關別需不同有執照的報關師</td></tr>
+    <tr><td>關別變更 &rarr; 更新報單號碼結構</td><td>號碼結構包含信箱碼，必須同步</td></tr>
+    <tr><td>關別變更 &rarr; 重查客戶包裝描述</td><td>6,264 筆客戶 &times; 站別設定，每組合有不同描述</td></tr>
+    <tr><td>倉庫 &rarr; 提貨地（港口/港名/公司）</td><td>真實業務：不同倉庫有不同提貨地點</td></tr>
+    <tr><td>DEP 切換 &rarr; 主提單格式（海運固定/空運自由）</td><td>海關規定</td></tr>
+  </table>
+</div>
+
+<!-- 四、轉口 -->
+<div class="section">
+  <h2>六、轉口報單特殊規則優化</h2>
+
+  <h3>4.1 客戶代碼首碼 &rarr; 到站別 — 建議改為主檔設定</h3>
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP：Magic Letter 判斷</h4>
+      <p>客戶代碼第一個字母 A &rarr; CS(竹科)、B &rarr; BS(南科)、C &rarr; DS(中科)</p>
+      <p>這是不成文的內部規則，不是海關要求。且只涵蓋 3 個字母對 3 個站。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統：客戶主檔設定</h4>
+      <p>在客戶主檔新增「預設轉運站別」欄位，明確設定而非靠代碼猜測。新增客戶不需符合字母命名規則。</p>
+    </div>
+  </div>
+
+  <h3>4.2 空運公司自動帶入 — 建議改為對照表</h3>
+  <table>
+    <tr><th>LRP hardcode</th><th>新系統建議</th></tr>
+    <tr><td>長榮海運 &rarr; 82065(北)/82806(南)<br>洋基/DHL &rarr; 82178/82807<br>UPS &rarr; 82096<br>FEDEX &rarr; 82034<br>五洲 &rarr; 21862 / 暢通 &rarr; 82227</td><td>建立 <strong>carrier_mapping</strong> 對照表，轉運類型 &rarr; 空運公司代碼。業務異動時在管理介面維護，不需改程式。</td></tr>
+  </table>
+</div>
+
+<!-- 五、通關網路 -->
+<div class="section">
+  <h2>七、通關網路傳輸路由簡化</h2>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>LRP：兩層間接</h4>
+      <p>報單欄位存「通關網路名稱」（CUSTOM01/02/03/04/CTSP）&rarr; 再查 TVMBOX 找「郵箱代碼」（PBK2309/ASE0340/S0910...）</p>
+      <p>「CUSTOM01 = 空運」「CUSTOM02 = 海運」這些名稱只是 alias，沒有實際語意。</p>
+    </div>
+    <div class="comparison-card new">
+      <h4>新系統：單層直接</h4>
+      <p>建立 <strong>EDI 路由設定表</strong>，以站別 + 空/海運 + 區內外為 key，直接對應郵箱代碼。</p>
+      <p>移除無意義的 CUSTOM01~04 alias 層。</p>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>備註</strong>：目前五崧的 EDI 傳輸確定使用 TRADEVAN，因此通關網路/郵箱機制仍為必要。優化重點在簡化代碼對應的間接層，而非移除整個機制。
+  </div>
+</div>
+
+<!-- 六、共用預設 -->
+<div class="section">
+  <h2>八、共用預設值處理方式</h2>
+
+  <p>LRP 的 50+ 共用預設值中，<strong>約 45 個是合理業務預設</strong>（繳費方式=先放後稅、訊息別=9、各旗標=N 等），直接用 Entity 層 default 值實作即可。</p>
+
+  <h3>可移除的技術殘留</h3>
+  <table>
+    <tr><th>欄位</th><th>LRP 值</th><th>建議</th></tr>
+    <tr><td><code>DATA_NO</code></td><td>'XX'（暫存編號）</td><td>LRP 內部狀態碼，新系統改用 UUID，不需此欄位</td></tr>
+    <tr><td><code>OT_FLAG</code></td><td>'X'（加班=無）</td><td>X/Y/N 語意不明，已改為 <code>isOvertime: boolean</code></td></tr>
+    <tr><td><code>REL_QTY</code></td><td>'1'（分關，不使用）</td><td>LRP 自己標記「不使用」，可移除</td></tr>
+  </table>
+</div>
+
+<!-- 七、總結 -->
+<div class="section">
+  <h2>優化行動總結</h2>
+
+  <table>
+    <tr><th>#</th><th>行動項目</th><th>效果</th><th>前置條件</th></tr>
+    <tr><td>1</td><td>PLMPARM 固定位置字串 &rarr; 結構化站別設定表</td><td>消除 82 筆難以維護的字串解析，新增站別不需改程式</td><td>確認表回覆後實作</td></tr>
+    <tr><td>2</td><td>客戶偏好自動帶入 5 欄位（裝貨地/幣別/貿易條件/港口/卸存地）</td><td>平均 67~96% 報單不需 OP 手動修改</td><td>客戶主檔擴充 + 歷史統計服務</td></tr>
+    <tr><td>3</td><td>園區通關(CPT)整併為 zoneType enum</td><td>減少 16 筆重複參數（CPT 年 27 萬筆仍活躍，但參數可整併）</td><td>無</td></tr>
+    <tr><td>4</td><td>運輸方式碼統一為 2 碼，移除 1↔2 碼轉換</td><td>消除雙軌邏輯和 Trans_TPT_MODE_to_OLD 轉換函式</td><td>確認帳單對照表是否一併升級</td></tr>
+    <tr><td>5</td><td>費用矩陣 hardcode &rarr; 費用模板設定表</td><td>費用碼增減不需改程式</td><td>確認費用碼清單</td></tr>
+    <tr><td>6</td><td>移除自貿區 F2/F3 強制信箱 543 規則</td><td>自貿區報單使用真實信箱</td><td>報單取號優化方案已處理</td></tr>
+    <tr><td>7</td><td>關別代碼→卸存地→提貨地連鎖簡化為直接選卸存地</td><td>簡化 UI 操作</td><td>確認表回覆</td></tr>
+    <tr><td>8</td><td>CT 客戶首碼判斷 &rarr; 客戶主檔設定</td><td>消除 magic letter 規則</td><td>確認表回覆</td></tr>
+    <tr><td>9</td><td>CT 空運公司 hardcode &rarr; carrier_mapping 對照表</td><td>業務異動不需改程式</td><td>無</td></tr>
+    <tr><td>10</td><td>通關網路 alias 層 &rarr; 直接郵箱對應</td><td>消除無意義間接層</td><td>確認 EDI 傳輸規劃</td></tr>
+  </table>
+
+  <div class="success-box">
+    <strong>核心原則</strong>：業務邏輯全部保留，技術實作全面現代化。凡是 LRP hardcode 在程式中的設定，新系統都改為管理介面可維護的設定表。
+  </div>
+</div>
+</div>
+
+</div>
+<script>
+function switchTab(t,b){
+  document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active')});
+  document.querySelectorAll('.tab-btn').forEach(function(e){e.classList.remove('active');e.classList.remove('active-green')});
+  document.getElementById('tab-'+t).classList.add('active');
+  b.classList.add(t==='optimize'?'active-green':'active');
+  window.scrollTo(0,document.querySelector('.tab-bar').offsetTop-20);
+}
+</script>
+</body>
+</html>
