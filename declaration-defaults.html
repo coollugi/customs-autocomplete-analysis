@@ -229,13 +229,17 @@
   </table>
 
   <div class="warning-box">
-    <strong>注意 — 專責人員停用問題</strong><br>
-    DB 顯示以下專責人員已停用，但 PLMPARM 預設值仍指向舊的代碼：
+    <strong>注意 — 專責人員預設值需定期維護</strong><br>
+    PLMPARM 的專責人員代碼寫死在 PARA_VALUE 字串內，若人員異動（離職、停牌、調站），需人工同步更新。民國 115 年 DB 實際使用 TOP 預設人員如下，請確認現行在職狀態，若有異動請提供接手人員代碼：
     <ul>
-      <li><strong>014 站</strong>：張春蘭(00942) 已停用 &rarr; 現行有效為葉美如(01488)</li>
-      <li><strong>367 站</strong>：謝德忠(00653) 已停用 &rarr; 現行有效為杜爭紋(01487)</li>
-      <li><strong>310 站</strong>：李昭芬(00808) 已停用 &rarr; 現行有效為李錦蘋(00902)</li>
+      <li><strong>014 信箱</strong>：張春蘭(00942)、葉美如(01488)</li>
+      <li><strong>194 信箱</strong>：蔡澄宥(00427)、江淑玲(00341)</li>
+      <li><strong>312 信箱</strong>：巫珮宜(00801)、廖泉吉(00667)</li>
+      <li><strong>543 信箱</strong>：林佳儷(00D67)、林孟儀(00D10)、蔡淑嬙(00929)</li>
+      <li><strong>310 信箱</strong>：李美惠(00725)</li>
+      <li><strong>367 信箱</strong>：謝德忠(00653)、胡秀英(01100)</li>
     </ul>
+    新系統規劃：改為對照表維護，避免 PARA_VALUE 寫死造成人員異動要改程式/參數字串的問題。
   </div>
 
   <h3>共用預設欄位（所有業務別通用，~50 欄）</h3>
@@ -333,7 +337,7 @@
     <strong>UX 設計注意事項</strong>：
     <ul>
       <li>卸存地 dropdown 內容需<strong>依業務別（空/海運 &times; 進/出口 &times; 區內外）動態篩選</strong>，不能全部混在一起（292 筆 &times; 8 種分類）</li>
-      <li>PLWHSNO 卸存地代碼有<strong>兩種長度格式</strong>：5 碼（如 C2036）和 8 碼（如 003C2036，前 3 碼為關區代碼）。報單存的是 8 碼，PLMCA 裡有些是 5 碼 — 需確認對應規則</li>
+      <li>PLWHSNO 卸存地代碼有<strong>兩種長度格式</strong>：5 碼（如 C2036）和 8 碼（如 003C2036，前 3 碼為關區代碼）。民國 115 年報單 DB 實際為 <strong>8 碼 259 萬筆（67%）+ 5 碼 125 萬筆（33%）並存</strong>，不是「報單一律 8 碼」— 需確認兩種格式各自使用的場景，以及新系統是否統一</li>
       <li>特殊值 <code>ZZZZZ</code>（旅客行李）和 <code>000ZZZZZ</code>（按月彙報）不是實際倉庫，是虛擬卸存地代碼</li>
       <li>進口和出口<strong>同一個關別</strong>（如 CA）對應<strong>不同的卸存地</strong>（進口=C2001 華儲進口倉、出口=C2002 華儲出口倉）</li>
     </ul>
@@ -568,7 +572,14 @@
     <tr><td>多 5 個日期欄位</td><td>實際轉運日/預計結關日/預計到貨日/預計結關時間/預計到貨時間</td></tr>
     <tr><td>預計時間預設 0000</td><td>&mdash;</td></tr>
     <tr><td>CT 客戶第一碼 &rarr; 到站別</td><td>A &rarr; CS(竹科) / B &rarr; BS(南科) / C &rarr; DS(中科)</td></tr>
-    <tr><td>CT 空運公司自動帶入</td><td>長榮=82065 / 洋基DHL=82178 / UPS=82096 / FEDEX=82034 / 五洲=21862 / 暢通=82227</td></tr>
+    <tr><td>CT 空運公司自動帶入<br><span style="font-size:12px;color:var(--gray-500);">（CTI020_CPT.pas Set_Aircmp L541-599）</span></td><td>根據 TRANS_TYPE 關鍵字 + 客戶代碼第一碼判斷：<br>
+      <code>日通自轉</code> &rarr; 82065 臺灣日通（A/C 開頭客戶）/ 82806 高雄分公司（B 開頭）<br>
+      <code>洋基快遞單</code> / <code>DHL</code> &rarr; 82178 洋基 DHL Express（A/C 非 BS/BR）/ 82807 洋基台南（B 或 BS/BR）<br>
+      <code>UPS自轉</code> / <code>UPS快遞單</code> &rarr; 82096 美商優比速 UPS<br>
+      <code>FEDEX自轉</code> &rarr; 82034 美商聯邦快遞 FedEx<br>
+      <code>浩威自轉</code> &rarr; 21862 浩威企業<br>
+      <code>永通自轉</code> &rarr; 82227 永通國際物流
+    </td></tr>
   </table>
 </div>
 
