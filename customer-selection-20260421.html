@@ -367,7 +367,7 @@
     <tr><th>事件 / 函式</th><th>檔案</th><th>行號</th></tr>
     <tr><td>DBEdit6Exit（選納稅義務人）</td><td>FII020_CPT.pas</td><td>3210-3289</td></tr>
     <tr><td>DBEdit53Exit（選買賣方）</td><td>FII020_CPT.pas</td><td>3304-3338</td></tr>
-    <tr><td>DBEdit145Exit（選付款人）</td><td>FII020_CPT.pas</td><td>6470-6497</td></tr>
+    <tr><td>DBEdit145Exit（選付款人）</td><td>FII020_CPT.pas</td><td>6463-6497</td></tr>
     <tr><td>DBEdit157Exit（選收貨人）</td><td>FII020_CPT.pas</td><td>6515-6534</td></tr>
     <tr><td>S02Exit（進口 客戶料號）</td><td>FII020_CPT.pas</td><td>5376-5387</td></tr>
     <tr><td>S02Exit（出口 客戶料號）</td><td>FEI020_CPT.pas</td><td>4758-4769</td></tr>
@@ -414,10 +414,9 @@
     </div>
   </div>
   <div class="orange-box">
-    <strong>效益估算（待客戶確認）</strong>：跳視窗的減少量取決於「主要聯絡人」標記的覆蓋率。<br>
+    <strong>效益估算</strong>：跳視窗的減少量取決於「主要聯絡人」標記的覆蓋率。<br>
     • 現況 main_contact='Y' 覆蓋率 4.6% → 直接套新邏輯只能消除 4.6% 的跳視窗操作<br>
-    • 若客戶部門配合批次標記，把覆蓋率推到 80%+ → 才能達到對應比例的消除效果<br>
-    請五崧確認：(1) OP 反映多筆聯絡人跳視窗是不是常見痛點 (2) 客戶部門是否願意做主要聯絡人批次標記
+    • 若客戶部門配合批次標記，把覆蓋率推到 80%+ → 才能達到對應比例的消除效果
   </div>
 </div>
 
@@ -433,7 +432,6 @@
     <tr><td><span class="tag tag-orange">保留但標記為廢棄</span></td><td>不確定是否還會用</td><td>保留欄位但不在 UI 出現、不參與 AutoComplete</td></tr>
     <tr><td><span class="tag tag-green">復活</span></td><td>業務希望分等級管理客戶但 LRP 沒做好</td><td>主檔提供下拉選單、報關時依等級套不同流程（例如 VIP 客戶先審查）</td></tr>
   </table>
-  <p>建議在五崧確認題拿到答案後再決定方向。</p>
 </div>
 
 <div class="section">
@@ -480,7 +478,7 @@
     </div>
   </div>
   <div class="success-box">
-    <strong>建議</strong>：先做客戶確認 — 「實務上同代碼的進出口料號內容差異多大？」決定方向。若差異很小，建議用方案 B 簡化資料模型；若差異大（例如進出口稅則完全不同），用方案 A。
+    <strong>判斷標準</strong>：實務上同代碼進出口料號內容差異很小 → 用方案 B 簡化；差異大（例如進出口稅則完全不同）→ 用方案 A。
   </div>
 </div>
 
@@ -509,9 +507,9 @@
 <div class="section">
   <h2>六、需確認後再優化的條件邏輯</h2>
   <h3>6.1 SHIPTO_CODEEQ（收貨人驗證號碼）</h3>
-  <p>選收貨人時若 codeq 非空就帶入 SHIPTO_CODEEQ — 用途不明，需要在客戶確認的回覆裡先了解業務情境，再決定新系統怎麼做。</p>
+  <p>選收貨人時若 codeq 非空就帶入 SHIPTO_CODEEQ — 用途不明，需先釐清業務情境再決定新系統怎麼做。</p>
   <h3>6.2 運輸方式 99 → 自動加包裝描述</h3>
-  <p>選買賣方時，若運輸方式 = 99（國內），會把客戶 pro_no 追加到「其他申報事項」欄位。這個條件邏輯散在多處，需要在客戶確認後決定：</p>
+  <p>選買賣方時，若運輸方式 = 99（國內），會把客戶 pro_no 追加到「其他申報事項」欄位。這個條件邏輯散在多處，可選：</p>
   <ul>
     <li>合併為單一規則：「99 國內運輸 → 套用 XX 模板」</li>
     <li>或者拆成獨立的「報單模板」概念，由 OP 主動套用</li>
