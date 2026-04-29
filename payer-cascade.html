@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoComplete 分析 — 主要付款人 7 級瀑布</title>
+<style>
+  :root {
+    --primary: #1a56db; --primary-light: #e8eefb;
+    --success: #059669; --success-light: #ecfdf5;
+    --warning: #d97706; --warning-light: #fffbeb;
+    --danger: #dc2626; --danger-light: #fef2f2;
+    --orange: #ea580c; --orange-light: #fff7ed;
+    --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+    --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; color: var(--gray-900); line-height: 1.7; background: var(--gray-50); }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+  .report-header { background: linear-gradient(135deg, #1e3a5f 0%, #1a56db 100%); color: white; padding: 60px 40px; border-radius: 16px; margin-bottom: 24px; }
+  .report-header h1 { font-size: 28px; margin-bottom: 8px; }
+  .report-header .subtitle { font-size: 18px; opacity: 0.85; margin-bottom: 20px; }
+  .report-header .meta { font-size: 14px; opacity: 0.7; }
+  .report-header .back { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 16px; }
+  .report-header .back:hover { color: white; }
+  .section { background: white; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .section h2 { font-size: 22px; color: var(--primary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--primary-light); }
+  .section h3 { font-size: 17px; color: var(--gray-700); margin: 24px 0 12px 0; }
+  h4 { font-size: 15px; margin: 20px 0 8px; color: var(--gray-500); }
+  .section p { margin-bottom: 12px; color: var(--gray-700); }
+  .highlight-box { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .warning-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .success-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .orange-box { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--gray-100); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); vertical-align: top; }
+  tr:hover td { background: var(--gray-50); }
+  td.center { text-align: center; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { background: var(--gray-100); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", "Fira Code", "Menlo", monospace; font-size: 13px; }
+  .code-block { background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 20px 24px; font-family: "SF Mono", "Fira Code", "Menlo", monospace; font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 16px 0; white-space: pre; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .tag-green { background: #bbf7d0; color: #166534; }
+  .tag-blue { background: #bfdbfe; color: #1e40af; }
+  .tag-orange { background: #fed7aa; color: #9a3412; }
+  .tag-red { background: #fecaca; color: #991b1b; }
+  .tag-gray { background: var(--gray-200); color: var(--gray-700); }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .stat-grid.four { grid-template-columns: repeat(4, 1fr); }
+  .stat-card { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 20px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: var(--primary); }
+  .stat-card .num.green { color: var(--success); }
+  .stat-card .num.orange { color: var(--orange); }
+  .stat-card .num.blue { color: var(--primary); }
+  .stat-card .num.red { color: var(--danger); }
+  .stat-card .label { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
+  .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  .comparison-card { border: 1px solid var(--gray-200); border-radius: 12px; padding: 20px; }
+  .comparison-card h4 { margin: 0 0 12px; font-size: 16px; color: var(--gray-900); }
+  .comparison-card.old { border-top: 4px solid var(--danger); background: var(--danger-light); }
+  .comparison-card.new { border-top: 4px solid var(--success); background: var(--success-light); }
+  ul, ol { margin: 8px 0 12px 24px; color: var(--gray-700); }
+  li { margin-bottom: 4px; }
+  .cascade-step { display: flex; align-items: flex-start; gap: 16px; padding: 16px; border: 1px solid var(--gray-200); border-radius: 8px; margin: 10px 0; background: white; }
+  .cascade-step .step-num { flex: 0 0 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .cascade-step .step-body { flex: 1; }
+  .cascade-step .step-body .title { font-weight: 600; color: var(--gray-900); margin-bottom: 4px; }
+  .cascade-step .step-body .cond { font-size: 13.5px; color: var(--gray-700); margin-bottom: 4px; }
+  .cascade-step .step-body .result { font-size: 13.5px; color: var(--success); font-weight: 600; }
+  .cascade-step.dead { background: var(--gray-50); }
+  .cascade-step.dead .step-num { background: var(--gray-500); }
+  .footnote { font-size: 12px; color: var(--gray-500); margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
+  .tab-bar { display: flex; gap: 0; background: white; border-radius: 12px 12px 0 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; position: sticky; top: 0; z-index: 10; }
+  .tab-btn { flex: 1; padding: 16px 24px; font-size: 16px; font-weight: 600; border: none; background: var(--gray-100); color: var(--gray-500); cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .tab-btn:hover { background: var(--gray-200); }
+  .tab-btn.active { background: white; color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+  .tab-btn.active-green { background: white; color: var(--success); box-shadow: inset 0 -3px 0 var(--success); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; padding-top: 24px; }
+  #tab-optimize .section h2 { color: var(--success); border-bottom-color: var(--success-light); }
+  @media print { body { background: white; } .container { padding: 0; } .report-header { border-radius: 0; } .section { box-shadow: none; border: 1px solid var(--gray-200); break-inside: avoid; } .tab-bar { display: none; position: static; } .tab-content { display: block !important; } }
+  @media (max-width: 768px) { .stat-grid, .stat-grid.four { grid-template-columns: repeat(2, 1fr); } .comparison-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="report-header">
+  <a class="back" href="index.html">&larr; 回到報告列表</a>
+  <h1>AutoComplete 分析</h1>
+  <div class="subtitle">主要付款人 7 級瀑布與配對表</div>
+  <div class="meta"><span>2026-04-29</span></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('current',this)">現行規則分析</button>
+  <button class="tab-btn" onclick="switchTab('optimize',this)">優化建議</button>
+</div>
+
+<div id="tab-current" class="tab-content active">
+
+
+<!-- 一、總覽 -->
+<div class="section">
+  <h2>一、報告總覽</h2>
+  <p>本份報告整理 LRP 報關系統「主要付款人自動帶入」的完整邏輯，對應建單後 OP 看到的「主要付款人」與各費用代碼的「指定費用付款人」欄位。</p>
+  <p>付款人帶入是建單流程中規則最複雜的一段，OP 不需手動選擇，系統會依以下機制自動帶入。本報告已對照原始程式（Set_DeclPayer，PUB_PROC.pas L4432-4986）與 LRP 資料庫實際資料完成驗證。</p>
+
+  <div class="stat-grid four">
+    <div class="stat-card"><div class="num blue">7 級</div><div class="label">優先瀑布</div></div>
+    <div class="stat-card"><div class="num blue">3 張</div><div class="label">配對表</div></div>
+    <div class="stat-card"><div class="num blue">193 條</div><div class="label">規則總數</div></div>
+    <div class="stat-card"><div class="num blue">95.3%</div><div class="label">建單後鎖定佔比</div></div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>本份新增資訊（相對於五崧 2026-03-11 整理的順位 5 文件）</strong>
+    <ul>
+      <li>4 維 / 3 維 / 5 維精確→萬用 fallback 矩陣（順位 5 文件僅描述優先順序，未說明配對命中邏輯）</li>
+      <li>三張表的次要條件比對規則（BS_NO / ACRY_CMPID / TRANS_TYPE）</li>
+      <li>VR_EXP 虛擬付款人機制</li>
+      <li>FT 與 G2/B1 報單類別下的 CUSTOM_NO ↔ BS_NO 自動反轉</li>
+      <li>DHL 自動轉「洋基快遞單」（CT 限定）</li>
+      <li>193 條規則的實際命中與年代分布</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 二、觸發時機與整體流程 -->
+<div class="section">
+  <h2>二、觸發時機與整體流程</h2>
+  <p>程式中共 11 處呼叫 Set_DeclPayer，分布在以下事件上：</p>
+
+  <table>
+    <tr><th>事件 / Procedure</th><th>觸發行為</th><th>Mode</th><th>位置（FII020_CPT.pas）</th></tr>
+    <tr><td>DBEdit6Exit</td><td>選或變更納稅義務人 (CUSTOM_NO) 後</td><td>0 主要</td><td>L3210-3272</td></tr>
+    <tr><td>DBEdit53Exit</td><td>選或變更交易對象 (BS_NO) 後</td><td>0 主要</td><td>L3304-3328</td></tr>
+    <tr><td>DBEdit115Exit</td><td>選或變更空運／承攬公司 (ACRY_CMPID) 後</td><td>0 主要</td><td>L7330-7347</td></tr>
+    <tr><td>DBEdit145Exit</td><td>選或取消主要付款人後（含取消 OP 手動指定）</td><td>0 主要</td><td>L6463-6494</td></tr>
+    <tr><td>DBLookupCombo1Exit</td><td>選或變更報單類別 (DECL_TYPE) 後</td><td>0 主要</td><td>L3770-3797</td></tr>
+    <tr><td>DBLookupCombo4Exit</td><td>變更運輸方式 (TPT_MODE) 後</td><td>0 主要</td><td>L2034-2051</td></tr>
+    <tr><td>DBCheckBox5Click</td><td>勾選或取消 FreeHouse</td><td>0 主要</td><td>L8027-8038</td></tr>
+    <tr><td>DBGrid3ColExit</td><td>費用項目 grid 變更費用代碼後</td><td>2 兩者</td><td>L6762-6779</td></tr>
+    <tr><td>SpeedButton11Click</td><td>按下「保稅」按鈕（Set_BanDescp 後）</td><td>0 主要</td><td>L4177-4201</td></tr>
+    <tr><td>BtnSaveClick</td><td>按下「儲存」按鈕，含 Excel 轉入流程</td><td>2/5 兩者</td><td>L2296-2566</td></tr>
+    <tr><td>BtnSaveClick</td><td>儲存前最後一次「常態付款人」變更</td><td>2 兩者</td><td>L2566-2571</td></tr>
+  </table>
+  <p>Mode 參數說明：0 = 只設定主要付款人；1 = 只設定費用代碼付款人；2 = 兩者皆設定。3-5 同 0-2 但不更動「區內運送資訊」的付款人。</p>
+
+  <h3>建單後鎖定（重要）</h3>
+  <div class="warning-box">
+    <strong>已計價或運輸計價鎖定的報單，付款人不再自動重算。</strong>
+    <p>程式判斷若 <code>AC_FLAG = 'Y'</code>（已計價）或 <code>DEC_RMK = 'Y'</code>（運輸計價鎖定），整段 Set_DeclPayer 直接結束不處理。</p>
+    <p>過去一年（2025-04-29 ~ 2026-04-29）報單統計：</p>
+    <table>
+      <tr><th>狀態</th><th>筆數</th><th>占比</th></tr>
+      <tr><td>已計價鎖定（AC_FLAG=Y）</td><td class="num">247,524</td><td class="num">95.3%</td></tr>
+      <tr><td>未鎖定（AC_FLAG=N + DEC_RMK=N）</td><td class="num">12,302</td><td class="num">4.7%</td></tr>
+    </table>
+    <p>意即整套 7 級瀑布在大部分時間是「靜音狀態」，僅作用於新建報單的編輯階段。本報告討論的所有規則皆指此編輯階段。</p>
+  </div>
+</div>
+
+<!-- 三、前置處理 -->
+<div class="section">
+  <h2>三、前置處理（4 項自動轉換）</h2>
+  <p>進入 7 級瀑布前，系統會先做幾項欄位轉換，這些轉換對 OP 來說透明，但會影響後續配對結果。</p>
+
+  <h3>3.1 CUSTOM_NO ↔ BS_NO 自動反轉</h3>
+  <p>當報單為轉運（DEP=FT）或進倉退關（DECL_TYPE in G2/B1）時，系統會把納稅義務人與交易對象互換後再進入瀑布判斷。</p>
+  <table>
+    <tr><th>條件</th><th>反轉前</th><th>反轉後（用來查 custpayer）</th></tr>
+    <tr><td>DEP = FT</td><td>CUSTOM_NO=A / BS_NO=B</td><td>當作 CUSTOM_NO=B / BS_NO=A 查詢</td></tr>
+    <tr><td>DECL_TYPE = G2 或 B1</td><td>CUSTOM_NO=A / BS_NO=B</td><td>當作 CUSTOM_NO=B / BS_NO=A 查詢</td></tr>
+  </table>
+  <p class="footnote">PUB_PROC.pas L4848-4854</p>
+
+  <h3>3.2 DHL → 洋基快遞單（CT 限定）</h3>
+  <p>當為轉運報單（DEP=CT）且 TRANS_TYPE='DHL' 時，系統自動把轉運方式改成「洋基快遞單」再去查配對表。</p>
+  <p class="footnote">PUB_PROC.pas L4884，註記為 2015-06-17 因新增 367 箱號而調整</p>
+
+  <h3>3.3 TPT_MODE 新→舊代碼轉換</h3>
+  <p>若 TPT_MODE 為新版 2 碼（關港貿 CPT 格式），系統呼叫 <code>Trans_TPT_MODE_to_OLD()</code> 轉成舊式 1 碼後再查 custpayer。完整對照表（Pure_Cache.pas L2065-2094）：</p>
+  <table>
+    <tr><th>新碼</th><th>新碼名稱</th><th>舊碼</th><th>舊碼名稱</th></tr>
+    <tr><td>1-6</td><td>舊碼，原樣保留</td><td>1-6</td><td>—</td></tr>
+    <tr><td>11</td><td>海運非貨櫃（有包裝雜貨）</td><td>1</td><td>海運非貨櫃</td></tr>
+    <tr><td>12</td><td>海運貨櫃</td><td>2</td><td>海運貨櫃</td></tr>
+    <tr><td>13</td><td>海運非貨櫃（無包裝散貨）</td><td>6</td><td>海運非貨櫃 BULK</td></tr>
+    <tr><td>14 / 15 / 16 / 51</td><td>海運自力推進 / 旅客攜帶 / 海運快遞 / 海運郵包</td><td>1</td><td>海運非貨櫃</td></tr>
+    <tr><td>41</td><td>空運非快遞</td><td>3</td><td>空運非貨櫃</td></tr>
+    <tr><td>42</td><td>空運快遞</td><td>3</td><td>空運非貨櫃</td></tr>
+    <tr><td>43 / 44 / 52</td><td>空運自力推進 / 旅客攜帶 / 空運郵包</td><td>3</td><td>空運非貨櫃</td></tr>
+    <tr><td>99 / 其他</td><td>其他運輸方式</td><td>5</td><td>無</td></tr>
+  </table>
+  <p>注意：新碼 42（空運快遞）轉舊碼 3，但<strong>順位 3 條件「FreeHouse / EXW 出口」中的 TPT_MODE&lt;&gt;'42' 是用原始新碼比對</strong>（程式直接讀 CusDec.TPT_MODE，沒先做轉換）。意即「sTPT_MODE 用於 custpayer 查詢時是舊碼，但用於條件判斷時保留新碼」，新舊並存。</p>
+  <p>新系統建議統一儲存格式（建議 2 碼新碼），相關規則表一次轉換完畢，移除這層轉換函式。</p>
+
+  <h3>3.4 跨報單抓「空轉運輸類別」（CI/CE/FI/FE 限定）</h3>
+  <p>對於海空運的進出口報單（DEP 第二碼為 I 或 E），系統會去 SCUSDEC 找對應的轉運報單，把該轉運報單的 TRANS_TYPE 撈出來作為 sTRANS_TYPE_IE_T，供後續快遞特殊設定（cust_express_payer_spec）比對使用。</p>
+  <p class="footnote">PUB_PROC.pas L4912-4917 + Get_T_TransType L4815-4834</p>
+</div>
+
+<!-- 四、7 級瀑布 -->
+<div class="section">
+  <h2>四、7 級優先瀑布</h2>
+  <p>系統依以下順序判斷主要付款人，前面的規則先命中就停止，不再往下找：</p>
+
+  <div class="cascade-step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="title">OP 手動指定（PAYER_BYUSER='Y'）</div>
+      <div class="cond">條件：OP 在報單上手動勾選或修改過付款人</div>
+      <div class="result">→ 結果：保留現有 PAYER_ID 不變</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="title">快遞單付款人特殊設定命中</div>
+      <div class="cond">條件：空運公司有設定 cust_express_payer_spec，且當前報單命中其 5 維組合（DEP × DECL_TYPE × SCIAREA_YN × TRANS_TYPE × DEC_CUSTOM_NO）</div>
+      <div class="result">→ 結果：付款人 = spec.PAYER_ID（若為 'VR_EXP' 則替換為當前報單的 CUSTOM_NO）</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="title">FreeHouse / EXW 出口</div>
+      <div class="cond">條件：勾選 FREEHOUSE_YN='Y'，或 TERMS='EXW' 且 DEP in (CE/FE) 且空運公司有值，且 TPT_MODE ≠ '42'</div>
+      <div class="result">→ 結果：付款人 = ACRY_CMPID（空運／承攬公司）</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="title">合作外銷（CORP='Y'）</div>
+      <div class="cond">條件：勾選合作外銷</div>
+      <div class="result">→ 結果：付款人 = TX_NO（保稅廠商）</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <div class="title">常態付款人命中（custpayer）</div>
+      <div class="cond">條件：以納稅義務人為 key，命中 custpayer 表的 4 維組合（DEP × DECL_TYPE × SCIAREA_YN × TPT_MODE）+ 次要條件（BS_NO / ACRY_CMPID / TRANS_TYPE）</div>
+      <div class="result">→ 結果：付款人 = custpayer.PAYER_ID</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <div class="title">快遞單付款人命中（cust_express_payer）</div>
+      <div class="cond">條件：以空運公司為 key，且該空運公司在快遞單付款人清單中是有資料的成員，命中 3 維組合（DEP × DECL_TYPE × SCIAREA_YN）+ 次要條件（TRANS_TYPE，僅 CT 比對）</div>
+      <div class="result">→ 結果：付款人 = cust_express_payer.PAYER_ID</div>
+    </div>
+  </div>
+
+  <div class="cascade-step">
+    <div class="step-num">7</div>
+    <div class="step-body">
+      <div class="title">Fallback：付款人 = 納稅義務人本人</div>
+      <div class="cond">條件：以上六項皆未命中</div>
+      <div class="result">→ 結果：付款人 = CUSTOM_NO（納稅義務人本人）</div>
+    </div>
+  </div>
+
+  <div class="orange-box">
+    <strong>與五崧 2026-03-11 整理文件的對應</strong>
+    <p>五崧內部整理的順位 5 文件描述完全吻合本份逆向結果，僅是順位 1-7 的順序與條件描述方式略有不同。本報告主要補充：</p>
+    <ul>
+      <li>每個順位的「次要條件」與「fallback 矩陣」如何運作</li>
+      <li>順位 2 與順位 6 的差別（spec 表 vs 主表）</li>
+      <li>順位 5 / 6 失敗時系統如何往下走，而非「立即跳到順位 7」</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 五、三張配對表 -->
+<div class="section">
+  <h2>五、三張配對表結構</h2>
+
+  <table>
+    <tr>
+      <th>表</th><th>用途</th><th>主 key（查詢起點）</th><th>維度欄位</th><th>次要條件</th><th>筆數</th>
+    </tr>
+    <tr>
+      <td>custpayer</td>
+      <td>常態付款人</td>
+      <td>納稅義務人 (CUSTOM_NO) + 站別 + 按月彙報</td>
+      <td>DEP / DECL_TYPE / SCIAREA_YN / TPT_MODE</td>
+      <td>BS_NO / ACRY_CMPID / TRANS_TYPE</td>
+      <td class="num">109</td>
+    </tr>
+    <tr>
+      <td>cust_express_payer</td>
+      <td>快遞單付款人</td>
+      <td>空運公司 (ACRY_CMPID) + 站別</td>
+      <td>DEP / DECL_TYPE / SCIAREA_YN</td>
+      <td>TRANS_TYPE（僅 CT）</td>
+      <td class="num">81</td>
+    </tr>
+    <tr>
+      <td>cust_express_payer_spec</td>
+      <td>快遞單付款人特殊設定</td>
+      <td>空運公司 (ACRY_CMPID) + 站別</td>
+      <td>DEP / DECL_TYPE / SCIAREA_YN / TRANS_TYPE / DEC_CUSTOM_NO</td>
+      <td>TRANS_TYPE（僅 CT）</td>
+      <td class="num">3</td>
+    </tr>
+  </table>
+
+  <h3>5.1 custpayer 規則分布（前 8 大組合）</h3>
+  <table>
+    <tr><th>站別</th><th>DEP</th><th>DECL_TYPE</th><th>SCIAREA</th><th>規則類型</th><th>筆數</th></tr>
+    <tr><td>AE100 桃機</td><td>CT 轉運</td><td>T1</td><td>X</td><td>主要</td><td class="num">13</td></tr>
+    <tr><td>AJ100 竹科</td><td>CE 出口</td><td>XX</td><td>Y 區內</td><td>費用碼</td><td class="num">13</td></tr>
+    <tr><td>AF100 台南</td><td>CE 出口</td><td>XX</td><td>Y 區內</td><td>費用碼</td><td class="num">11</td></tr>
+    <tr><td>AJ100 竹科</td><td>XX</td><td>D7</td><td>X</td><td>主要</td><td class="num">10</td></tr>
+    <tr><td>AJ100 竹科</td><td>XX</td><td>XX</td><td>X</td><td>費用碼</td><td class="num">8</td></tr>
+    <tr><td>AJ100 竹科</td><td>XX</td><td>D7</td><td>X 按月彙報</td><td>主要</td><td class="num">6</td></tr>
+    <tr><td>AJ100 竹科</td><td>XX</td><td>G2</td><td>X</td><td>主要</td><td class="num">5</td></tr>
+    <tr><td>AF100 台南</td><td>XX</td><td>D7</td><td>X</td><td>主要</td><td class="num">3</td></tr>
+  </table>
+
+  <h3>5.2 cust_express_payer 規則分布（前 5 大組合）</h3>
+  <table>
+    <tr><th>站別</th><th>DEP</th><th>DECL_TYPE</th><th>SCIAREA</th><th>TRANS_TYPE</th><th>類型</th><th>筆數</th></tr>
+    <tr><td>AJ100 竹科</td><td>CE 出口</td><td>XX</td><td>X</td><td>—</td><td>費用碼</td><td class="num">45</td></tr>
+    <tr><td>AE100 桃機</td><td>CT 轉運</td><td>XX</td><td>N 區外</td><td>—</td><td>費用碼</td><td class="num">4</td></tr>
+    <tr><td>AJ100 竹科</td><td>CE 出口</td><td>XX</td><td>Y 區內</td><td>—</td><td>費用碼</td><td class="num">3</td></tr>
+    <tr><td>AE100 桃機</td><td>CT 轉運</td><td>XX</td><td>N 區外</td><td>永通自轉</td><td>主要</td><td class="num">1</td></tr>
+    <tr><td>AE100 桃機</td><td>CT 轉運</td><td>XX</td><td>N 區外</td><td>日通自轉</td><td>主要</td><td class="num">1</td></tr>
+  </table>
+  <p>表中可看出 cust_express_payer 規則的兩種主要用途：</p>
+  <ul>
+    <li><strong>主要付款人規則（27 筆）</strong>：依「站別 + 轉運方式」設定，例如桃機+永通自轉=永通付、桃機+洋基快遞單=洋基付。涵蓋 5 站 × 5 種轉運方式（永通/日通/浩威/洋基-DHL/FedEx）</li>
+    <li><strong>費用碼規則（54 筆）</strong>：絕大多數為竹科出口（AJ100/CE）的費用碼專屬付款人</li>
+  </ul>
+
+  <h3>5.3 cust_express_payer_spec 全部 3 筆</h3>
+  <table>
+    <tr><th>seq</th><th>空運公司</th><th>站別/DEP/DECL/SCI</th><th>TRANS_TYPE</th><th>指定貨主</th><th>付款人</th></tr>
+    <tr><td>1</td><td>82178 洋基</td><td>AJ100 / CI / XX / Y 區內</td><td>洋基快遞單</td><td>A098 台積電竹科</td><td>82178 洋基</td></tr>
+    <tr><td>2</td><td>82178 洋基</td><td>AJ100 / CI / XX / Y 區內</td><td>洋基快遞單</td><td>A353 遠東金士頓</td><td>82178 洋基</td></tr>
+    <tr><td>3</td><td>82178 洋基</td><td>AJ100 / CI / XX / Y 區內</td><td>洋基快遞單</td><td>XXXXX 萬用</td><td>VR_EXP 虛擬</td></tr>
+  </table>
+  <p>spec 表的設計語意：對洋基（82178），當報單為竹科進口區內 + 洋基快遞單時，若報單貨主是 A098 或 A353，付款人=洋基；其他客戶 fallback 到「VR_EXP=該客戶本人」。詳見第 8 章。</p>
+</div>
+
+<!-- 六、fallback 矩陣 -->
+<div class="section">
+  <h2>六、精確→萬用 fallback 矩陣</h2>
+  <p>每張配對表查詢時，並非只看「完全精確匹配」一筆。系統會走巢狀迴圈，依下表組合順序查找，先精確值、再萬用值。</p>
+
+  <h3>6.1 custpayer：4 維 16 組合</h3>
+  <p>查詢條件：CUSTOM_NO + STATION + BRMONTH_YN 為精準 key（必須完全匹配），下列 4 維各自有「精確值 / 萬用值」兩種選項。</p>
+  <table>
+    <tr><th>維度</th><th>精確值</th><th>萬用值</th></tr>
+    <tr><td>DEP（業務別）</td><td>FI / FE / CI / CE / CT / FT</td><td>XX</td></tr>
+    <tr><td>DECL_TYPE（報單類別）</td><td>G1 / D7 / B6 / B8 / G2 / T1 ...</td><td>XX</td></tr>
+    <tr><td>SCIAREA_YN（區內外）</td><td>Y / N</td><td>X</td></tr>
+    <tr><td>TPT_MODE（運輸方式）</td><td>1-9（舊碼）</td><td>X</td></tr>
+  </table>
+  <p>系統依「全精確 → 逐維放寬到萬用」順序嘗試 16 種組合，第一個命中就停止。萬用值的設計讓客戶可以「對所有 DEP / DECL_TYPE 都套用同一條規則」。</p>
+  <p class="footnote">PUB_PROC.pas L4450-4507（lcSeek_Detial_Cust）</p>
+
+  <h3>6.2 cust_express_payer：3 維 8 組合</h3>
+  <p>查詢條件：CUSTOM_NO（=空運公司）+ STATION 為精準 key。3 維各有精確/萬用：</p>
+  <table>
+    <tr><th>維度</th><th>精確值</th><th>萬用值</th></tr>
+    <tr><td>DEP</td><td>CT / CI / CE / FI / FE</td><td>XX</td></tr>
+    <tr><td>DECL_TYPE</td><td>T1 / B8 / B9 / G1 ...</td><td>XX</td></tr>
+    <tr><td>SCIAREA_YN</td><td>Y / N</td><td>X</td></tr>
+  </table>
+  <p>共 2³ = 8 種組合。比 custpayer 少 TPT_MODE 維度，因為快遞單通常不依運輸方式分付款人。</p>
+  <p class="footnote">PUB_PROC.pas L4512-4561（lcSeek_Detial_Express）</p>
+
+  <h3>6.3 cust_express_payer_spec：5 維 32 組合</h3>
+  <p>spec 表多兩個維度（轉運方式、指定貨主），共 2⁵ = 32 種組合：</p>
+  <table>
+    <tr><th>維度</th><th>精確值</th><th>萬用值</th></tr>
+    <tr><td>DEP</td><td>CI / CE ...</td><td>XX</td></tr>
+    <tr><td>DECL_TYPE</td><td>G1 / D7 ...</td><td>XX</td></tr>
+    <tr><td>SCIAREA_YN</td><td>Y / N</td><td>X</td></tr>
+    <tr><td>TRANS_TYPE</td><td>洋基快遞單 / UPS快遞單 ...</td><td>X</td></tr>
+    <tr><td>DEC_CUSTOM_NO</td><td>A098 / A353 ...</td><td>XXXXX</td></tr>
+  </table>
+  <p class="footnote">PUB_PROC.pas L4566-4624（lcSeek_Detial_Express_Spec）</p>
+</div>
+
+<!-- 七、次要條件 -->
+<div class="section">
+  <h2>七、次要條件比對</h2>
+  <p>fallback 矩陣命中後，系統會再用「次要條件」驗證該筆規則是否真的適用本報單。次要條件不參與 fallback，是「該筆規則的額外限制」。</p>
+
+  <h3>7.1 custpayer 三項次要條件</h3>
+  <table>
+    <tr><th>欄位</th><th>判斷</th></tr>
+    <tr><td>BS_NO（指定交易對象）</td><td>若規則此欄位有值，必須等於本報單的 BS_NO 才視為命中</td></tr>
+    <tr><td>ACRY_CMPID（指定空運公司）</td><td>若規則此欄位有值，必須等於本報單的 ACRY_CMPID 才視為命中</td></tr>
+    <tr><td>TRANS_TYPE（指定轉運方式）</td><td>僅當 DEP=CT 時比對；若規則此欄位有值，必須等於本報單轉換後的 TRANS_TYPE 才視為命中</td></tr>
+  </table>
+
+  <h3>7.2 cust_express_payer 一項次要條件</h3>
+  <table>
+    <tr><th>欄位</th><th>判斷</th></tr>
+    <tr><td>TRANS_TYPE</td><td>僅當 DEP=CT 時比對；若規則此欄位有值，必須等於本報單轉換後的 TRANS_TYPE 才視為命中</td></tr>
+  </table>
+
+  <h3>7.3 cust_express_payer_spec 一項次要條件</h3>
+  <table>
+    <tr><th>欄位</th><th>判斷</th></tr>
+    <tr><td>TRANS_TYPE</td><td>僅當 DEP=CT 時比對；若規則此欄位有值，必須等於本報單轉換後的 TRANS_TYPE 才視為命中</td></tr>
+  </table>
+  <p>注意：spec 表 5 維中本身就有 TRANS_TYPE 維度（會跑 fallback），這個「次要條件比對」是在進入 lcSeek_Detial 後額外的二次檢查（基本上重複）。</p>
+</div>
+
+<!-- 八、VR_EXP -->
+<div class="section">
+  <h2>八、VR_EXP 虛擬付款人機制</h2>
+  <p>spec 表的 PAYER_ID 欄位有一個特殊值 <code>VR_EXP</code>，並非真正的客戶代碼，而是一個虛擬標記。</p>
+
+  <div class="highlight-box">
+    <strong>機制：</strong>當 spec 表規則命中且 PAYER_ID='VR_EXP' 時，系統會把 PAYER_ID 替換為「當前報單的納稅義務人 CUSTOM_NO」。
+    <p class="footnote" style="margin-top:8px; padding-top:0; border:none;">PUB_PROC.pas L4613</p>
+  </div>
+
+  <h3>8.1 為什麼需要這個機制？</h3>
+  <p>spec 表的 5 維設計中，DEC_CUSTOM_NO 維度可以填萬用值 <code>XXXXX</code>。但若規則設「當條件命中時，付款人=任何客戶都用 X 客戶」這種寫法，無法表達「付款人=該客戶自己」這種語意。</p>
+  <p>VR_EXP 提供了一種「動態替換」的能力：規則寫一次，但實際結果依當前報單的客戶而變。</p>
+
+  <h3>8.2 實際使用情況</h3>
+  <p>目前資料庫只有 <strong>1 筆</strong> spec 規則使用 VR_EXP（spec seq=3）：</p>
+  <ul>
+    <li>條件：洋基（82178）+ AJ100 竹科 + CI 進口 + 區內 + 洋基快遞單 + 任何客戶</li>
+    <li>結果：付款人 = 該客戶自己</li>
+  </ul>
+  <p>另兩筆（A098 / A353）為精準對應到「指定客戶=指定付款人=洋基」的硬規則。</p>
+</div>
+
+<!-- 九、費用代碼次配對 -->
+<div class="section">
+  <h2>九、費用代碼次配對</h2>
+  <p>主要付款人決定後，每個費用代碼的「指定費用付款人」也會各自再配對一次。意即同一張報單上，D102 報關費的付款人和 T101 聯合運費的付款人可以不同。</p>
+
+  <h3>9.1 配對來源依主要付款人路徑而定</h3>
+  <table>
+    <tr><th>主要付款人來自</th><th>費用碼配對表</th><th>fallback 矩陣</th></tr>
+    <tr><td>順位 6（cust_express_payer）或 7（fallback 到納稅義務人）</td><td>cust_express_payer</td><td>3 維 8 組合</td></tr>
+    <tr><td>順位 2（cust_express_payer_spec）</td><td>cust_express_payer_spec</td><td>5 維 32 組合</td></tr>
+    <tr><td>其他（順位 1/3/4/5）</td><td>custpayer</td><td>4 維 16 組合</td></tr>
+  </table>
+  <p class="footnote">PUB_PROC.pas L4976-4984</p>
+
+  <h3>9.2 費用碼分布</h3>
+  <p>三表合計 99 條費用碼專屬規則，集中在以下費用代碼：</p>
+  <table>
+    <tr><th>費用代碼</th><th>名稱</th><th>規則數</th></tr>
+    <tr><td>D220</td><td>貼紙標</td><td class="num">46</td></tr>
+    <tr><td>D102</td><td>報關費</td><td class="num">14</td></tr>
+    <tr><td>D104</td><td>EDI 傳送費</td><td class="num">14</td></tr>
+    <tr><td>D112</td><td>加頁</td><td class="num">11</td></tr>
+    <tr><td>T101</td><td>聯合運費</td><td class="num">5</td></tr>
+    <tr><td>D999</td><td>（待五崧確認）</td><td class="num">5</td></tr>
+    <tr><td>T101A / T102 / D101</td><td>—</td><td class="num">各 1-2</td></tr>
+  </table>
+</div>
+
+<!-- 十、規則使用情況分析 -->
+<div class="section">
+  <h2>十、規則使用情況分析</h2>
+
+  <h3>10.1 規則建立年代分布</h3>
+  <p>三表規則絕大多數設定於 2009-2017，近 8 年新增極少：</p>
+  <table>
+    <tr><th>表</th><th>2009-2014</th><th>2015-2019</th><th>2020-2026</th><th>最近一筆</th></tr>
+    <tr><td>custpayer</td><td class="num">89</td><td class="num">17</td><td class="num">3</td><td>2023</td></tr>
+    <tr><td>cust_express_payer</td><td class="num">72</td><td class="num">9</td><td class="num">0</td><td>2017</td></tr>
+    <tr><td>cust_express_payer_spec</td><td class="num">0</td><td class="num">0</td><td class="num">3</td><td>2020</td></tr>
+  </table>
+  <p>cust_express_payer 從 2017 起 8 年無新增，spec 表 5 年無新增。實務上業務變動是否仍透過此機制設定，待五崧確認。</p>
+
+  <h3>10.2 近一年活躍度（custpayer）</h3>
+  <p>把 custpayer 109 筆規則的「納稅義務人」對照過去一年（2025-04 ~ 2026-04）SCUSDEC 是否有報單：</p>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num green">88 條</div><div class="label">客戶近一年活躍（80.7%）</div></div>
+    <div class="stat-card"><div class="num orange">21 條</div><div class="label">客戶近一年無報單（19.3%）</div></div>
+    <div class="stat-card"><div class="num blue">23 家</div><div class="label">活躍客戶總數</div></div>
+  </div>
+
+  <h3>10.3 近一年無報單的客戶（21 條規則）</h3>
+  <table>
+    <tr><th>客戶</th><th>名稱</th><th>規則數</th><th>備註</th></tr>
+    <tr><td>B021</td><td>[刪除]奇美電子股份有限公司</td><td class="num">10</td><td><span class="tag tag-red">客戶名稱已標 [刪除]</span></td></tr>
+    <tr><td>A662</td><td>松瑞製藥股份有限公司</td><td class="num">4</td><td>—</td></tr>
+    <tr><td>24346</td><td>奧迪福斯汽車股份有限公司</td><td class="num">3</td><td>—</td></tr>
+    <tr><td>82034</td><td>FedEx 台灣分公司</td><td class="num">1</td><td>身為「納稅義務人」角色未活躍</td></tr>
+    <tr><td>11784</td><td>台灣恩益禧（NEC）</td><td class="num">1</td><td>—</td></tr>
+    <tr><td>24508</td><td>韓商恒友台北代表處</td><td class="num">1</td><td>—</td></tr>
+    <tr><td>35880</td><td>達發科技竹北分公司</td><td class="num">1</td><td>可能改用其他客戶代碼</td></tr>
+  </table>
+  <p>這 21 條規則是「dead rule 候選」，但需五崧確認是否清理。</p>
+
+  <h3>10.4 cust_express_payer 中發現的資料異常</h3>
+  <div class="warning-box">
+    <strong>82227x（多了一個 x）— 7 筆規則</strong>
+    <p>cust_express_payer 表中有 7 筆規則的 custom_no='82227x'，但 LRP custom 客戶主檔中查無此代碼（只有 82227 永通國際物流）。所有 7 筆規則的 PAYER_ID 設為 82227（正確），代表設定者本意是針對永通。</p>
+    <p>由於 source code 是用報單上的 ACRY_CMPID（必為 82227 不會有 x）去查 cust_express_payer.custom_no，這 7 筆 key 為 82227x 的規則 <strong>永遠不會被命中</strong>。</p>
+    <p>規則建立日期皆為 2012-01-01，已殭屍 13 年。</p>
+  </div>
+
+  <h3>10.5 萬用值佔比</h3>
+  <table>
+    <tr><th>表</th><th>DEP=XX</th><th>DECL_TYPE=XX</th><th>SCIAREA=X</th><th>TPT_MODE=X</th></tr>
+    <tr><td>custpayer</td><td class="num">55%</td><td class="num">42%</td><td class="num">70%</td><td class="num">91%</td></tr>
+    <tr><td>cust_express_payer</td><td class="num">0%</td><td class="num">91%</td><td class="num">62%</td><td>—</td></tr>
+    <tr><td>cust_express_payer_spec</td><td class="num">0%</td><td class="num">100%</td><td class="num">0%</td><td>—</td></tr>
+  </table>
+  <p>觀察：</p>
+  <ul>
+    <li>custpayer 的 TPT_MODE 維度 91% 都是萬用，意即「按運輸方式設定不同付款人」這個能力幾乎沒人用</li>
+    <li>cust_express_payer 沒有任何 DEP=XX，全部精準到 DEP（多為 CT 轉運），符合快遞單的業務語意</li>
+  </ul>
+
+  <h3>10.6 客戶分布（custpayer 前 10 大）</h3>
+  <table>
+    <tr><th>客戶</th><th>名稱</th><th>規則數</th><th>狀態</th></tr>
+    <tr><td>A364</td><td>台灣美日先進光罩</td><td class="num">24</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>B001</td><td>台積電（南科廠）</td><td class="num">11</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>B021</td><td>[刪除]奇美電子</td><td class="num">10</td><td><span class="tag tag-red">無報單</span></td></tr>
+    <tr><td>11226</td><td>富積電子</td><td class="num">9</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A038</td><td>台揚科技</td><td class="num">8</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A004</td><td>聯華電子</td><td class="num">5</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A098</td><td>台積電（竹科廠）</td><td class="num">4</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A121</td><td>鼎元光電</td><td class="num">4</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A353</td><td>遠東金士頓</td><td class="num">4</td><td><span class="tag tag-green">活躍</span></td></tr>
+    <tr><td>A662</td><td>松瑞製藥</td><td class="num">4</td><td><span class="tag tag-red">無報單</span></td></tr>
+  </table>
+  <p>說明：A098 與 B001 兩個客戶代碼皆為「台積電」，分別對應竹科廠與南科廠。客戶端建議在新系統釐清是否需要拆兩組或合併。</p>
+</div>
+
+<!-- 十一、總結 -->
+<div class="section">
+  <h2>十一、總結</h2>
+  <div class="success-box">
+    <strong>本報告涵蓋的範圍</strong>
+    <ul>
+      <li>付款人 7 級瀑布的完整邏輯（含五崧 2026-03-11 文件未載明的細節）</li>
+      <li>三張配對表（193 條規則）的結構、維度、命中規則</li>
+      <li>fallback 矩陣的精確→萬用順序</li>
+      <li>VR_EXP 虛擬付款人機制</li>
+      <li>費用代碼次配對的分流條件</li>
+      <li>193 條規則的年代分布、活躍度與資料異常</li>
+    </ul>
+  </div>
+
+  <div class="orange-box">
+    <strong>建議由五崧確認的重點</strong>
+    <ol>
+      <li>21 條 custpayer dead rule 候選（含 [刪除] 奇美電子 10 筆）是否可清理</li>
+      <li>82227x（永通舊代碼）7 筆殭屍規則是否可刪</li>
+      <li>spec 表 3 筆規則過去一年命中為 0，是否仍要保留</li>
+      <li>D999 費用代碼的用途（新系統是否仍需）</li>
+      <li>cust_express_payer 8 年無新增、spec 5 年無新增，新增/維護流程是否仍存在</li>
+      <li>A098 / B001 兩個台積電代碼是否要在新系統釐清</li>
+    </ol>
+  </div>
+
+  <p class="footnote">資料來源：LRP source code（PUB_PROC.pas L4432-4986） + LRP 資料庫實際資料 + 五崧 2026-03-11 整理之順位 5 文件。逆向分析日期：2026-04-29。</p>
+</div>
+</div>
+
+<div id="tab-optimize" class="tab-content">
+
+
+<!-- 總覽 -->
+<div class="section">
+  <h2>優化總覽</h2>
+  <p>本份對應現況報告的優化建議，分為三類：</p>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num green">5 項</div><div class="label">必須保留的業務邏輯</div></div>
+    <div class="stat-card"><div class="num orange">7 項</div><div class="label">可優化 / 不應盲遷</div></div>
+    <div class="stat-card"><div class="num blue">3 項</div><div class="label">新系統建議新增功能</div></div>
+  </div>
+</div>
+
+<!-- ===== 一、清理 dead rule ===== -->
+<div class="section">
+  <h2>一、清理 dead rule</h2>
+
+  <div class="warning-box">
+    <strong>193 條規則中至少 28 條近一年無命中</strong>
+    <p>清理 SQL 計算依據：custpayer 21 條（19.3%）+ cust_express_payer 7 條（8.6%）= 28 條，近一年的命中數：</p>
+    <ul>
+      <li>custpayer：以納稅義務人對照過去一年 SCUSDEC，21 條規則的客戶完全沒有報單</li>
+      <li>cust_express_payer：82227x 的 7 條規則，因 ACRY_CMPID 永遠等於 82227（永通真實代碼）不會等於 82227x，路徑上 0 命中</li>
+    </ul>
+  </div>
+
+  <h3>1.1 custpayer 21 條 dead 候選</h3>
+  <table>
+    <tr><th>客戶代碼</th><th>名稱</th><th>規則數</th><th>建議處理</th></tr>
+    <tr><td>B021</td><td>[刪除]奇美電子股份有限公司</td><td class="num">10</td><td>客戶名稱已標 [刪除]，新系統清掉</td></tr>
+    <tr><td>A662</td><td>松瑞製藥股份有限公司</td><td class="num">4</td><td>過去一年無報單，遷移時不帶過去</td></tr>
+    <tr><td>24346</td><td>奧迪福斯汽車股份有限公司</td><td class="num">3</td><td>同上</td></tr>
+    <tr><td>82034</td><td>FedEx 台灣分公司</td><td class="num">1</td><td>FedEx 為「納稅義務人」角色未活躍（與作為空運公司不同）</td></tr>
+    <tr><td>11784</td><td>台灣恩益禧（NEC）</td><td class="num">1</td><td>過去一年無報單</td></tr>
+    <tr><td>24508</td><td>韓商恒友台北代表處</td><td class="num">1</td><td>同上</td></tr>
+    <tr><td>35880</td><td>達發科技竹北分公司</td><td class="num">1</td><td>可能改用其他客戶代碼</td></tr>
+  </table>
+
+  <h3>1.2 cust_express_payer 7 條殭屍（82227x）</h3>
+  <p>建立日期 2012-01-01，已 13 年無命中。設定者本意是針對永通（82227），但 key 寫成 82227x，永遠匹配不到 ACRY_CMPID。</p>
+  <table>
+    <tr><th>seq</th><th>站別</th><th>規則用途</th><th>狀態</th></tr>
+    <tr><td>1-2</td><td>AE100</td><td>T101/T101A 費用碼配對</td><td><span class="tag tag-red">殭屍</span></td></tr>
+    <tr><td>3</td><td>AE100</td><td>永通自轉主要付款人</td><td><span class="tag tag-red">殭屍</span></td></tr>
+    <tr><td>4-7</td><td>AJ100/AH100/AF100/AF110</td><td>永通自轉主要付款人（4 站各一）</td><td><span class="tag tag-red">殭屍</span></td></tr>
+  </table>
+  <p><strong>建議行動：</strong>新系統遷移時，將 82227x 的 7 條規則重新建立為 82227（並覆蓋既有 82227 規則時人工確認），或直接判斷其與既有 82227 規則重複後刪除。</p>
+
+  <h3>1.3 行動清單</h3>
+  <ol>
+    <li>遷移腳本加上 dead rule filter，預設不帶 21 條 custpayer dead 候選 + 7 條 82227x</li>
+    <li>新系統提供「規則使用統計」面板（見第六項），讓 OP 主管能持續追蹤</li>
+    <li>B021 [刪除] 此類已標記命名的客戶，新系統客戶主檔加 status 欄位區分</li>
+  </ol>
+</div>
+
+<!-- ===== 二、TPT_MODE 統一新碼 ===== -->
+<div class="section">
+  <h2>二、TPT_MODE 統一為新碼，移除轉換層</h2>
+
+  <p>現行 LRP 同時維護新舊兩套運輸方式碼，Set_DeclPayer 內呼叫 Trans_TPT_MODE_to_OLD 把新碼轉舊碼後查 custpayer，但條件判斷「TPT_MODE&lt;&gt;'42'」又比對的是新碼，新舊並存增加維護成本。</p>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>現行：新舊並存</h4>
+      <ul>
+        <li>SCUSDEC.TPT_MODE 已全面採新碼（例 41/42/12/99）</li>
+        <li>custpayer.TPT_MODE 多為舊碼（1/2/3/5）</li>
+        <li>查詢時呼叫轉換函式 Trans_TPT_MODE_to_OLD</li>
+        <li>條件判斷 TPT_MODE&lt;&gt;'42' 又用回新碼</li>
+        <li>近一年 SCUSDEC 27 萬筆 2 碼 vs 133 筆 1 碼，舊碼幾乎絕跡</li>
+      </ul>
+    </div>
+    <div class="comparison-card new">
+      <h4>建議：新系統統一新碼</h4>
+      <ul>
+        <li>所有資料表 TPT_MODE 欄位統一存 2 碼新碼</li>
+        <li>遷移時把 custpayer.tpt_mode 一次轉換完畢（91% 為萬用值 X，影響範圍小）</li>
+        <li>移除 Trans_TPT_MODE_to_OLD 函式</li>
+        <li>條件判斷統一以新碼操作</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>SQL 計算依據：custpayer 109 條中 99 條（91%）tpt_mode 欄位為萬用 X，僅 10 條精準到舊碼 3/4/5；按舊→新對照轉換為 41/42/43 群組（空運非快遞 / 空運快遞 / 空運自力推進）後，覆蓋程度與原本相當。</p>
+</div>
+
+<!-- ===== 三、VR_EXP 改顯式 enum ===== -->
+<div class="section">
+  <h2>三、VR_EXP 改顯式 enum 欄位</h2>
+
+  <p>現行 cust_express_payer_spec 用字串值 'VR_EXP' 當虛擬付款人標記，靠程式 if 比對處理。屬於 magic string，新人接手難以察覺其特殊意義。</p>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <h4>現行：magic string</h4>
+      <ul>
+        <li><code>PAYER_ID = 'VR_EXP'</code> 字串</li>
+        <li>程式 if 判斷後動態替換為 CUSTOM_NO</li>
+        <li>客戶主檔查不到 VR_EXP（資料完整性無法驗證）</li>
+      </ul>
+    </div>
+    <div class="comparison-card new">
+      <h4>建議：顯式 enum 欄位</h4>
+      <ul>
+        <li>新增 <code>payer_resolution: enum</code> 欄位</li>
+        <li>值：<code>STATIC</code>（用 payer_id）/ <code>SAME_AS_DECLARANT</code>（=當前納稅義務人）</li>
+        <li>規則語意明確，不需要看程式才懂</li>
+        <li>未來易擴充其他動態解析方式（例：=當前空運公司）</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>影響範圍：目前只有 1 筆規則使用 VR_EXP（spec seq=3），遷移成本低。</p>
+</div>
+
+<!-- ===== 四、合併三表為單一規則表 ===== -->
+<div class="section">
+  <h2>四、三張配對表合併為單一規則表</h2>
+
+  <p>現行三表結構雷同（皆為 維度 + 次要條件 + payer_id），但欄位不一致、fallback 維度數量也不同。新系統可合併為一張規則表 + 規則類型 enum。</p>
+
+  <h3>4.1 合併前後對照</h3>
+  <table>
+    <tr><th>面向</th><th>現行</th><th>建議</th></tr>
+    <tr><td>表格數</td><td>3 張（custpayer / cust_express_payer / cust_express_payer_spec）</td><td>1 張（payer_rule）</td></tr>
+    <tr><td>規則類型</td><td>用「該規則在哪張表」隱含</td><td>顯式 enum：<code>NORMAL / EXPRESS / EXPRESS_SPEC</code></td></tr>
+    <tr><td>主 key</td><td>三表各自設計</td><td>共用 (rule_type, custom_no, seq_no)</td></tr>
+    <tr><td>維度欄位</td><td>各表互不相同</td><td>統一 8 欄，類型不適用就留空</td></tr>
+    <tr><td>fallback 維度</td><td>4 / 3 / 5 維</td><td>per rule_type 設定 fallback 順序</td></tr>
+  </table>
+
+  <h3>4.2 維度欄位整併</h3>
+  <table>
+    <tr><th>欄位</th><th>NORMAL 用</th><th>EXPRESS 用</th><th>EXPRESS_SPEC 用</th></tr>
+    <tr><td>dep</td><td>✓ 4 維 fallback</td><td>✓ 3 維 fallback</td><td>✓ 5 維 fallback</td></tr>
+    <tr><td>decl_type</td><td>✓ 4 維</td><td>✓ 3 維</td><td>✓ 5 維</td></tr>
+    <tr><td>sciarea_yn</td><td>✓ 4 維</td><td>✓ 3 維</td><td>✓ 5 維</td></tr>
+    <tr><td>tpt_mode</td><td>✓ 4 維</td><td>—</td><td>—</td></tr>
+    <tr><td>brmonth_yn</td><td>✓ 精準 key</td><td>—</td><td>—</td></tr>
+    <tr><td>trans_type</td><td>次要</td><td>次要</td><td>✓ 5 維</td></tr>
+    <tr><td>dec_custom_no</td><td>—</td><td>—</td><td>✓ 5 維</td></tr>
+    <tr><td>bs_no / acry_cmpid</td><td>次要</td><td>—</td><td>—</td></tr>
+    <tr><td>chg_cd</td><td>NULL=主要 / 否則=費用碼</td><td>NULL=主要 / 否則=費用碼</td><td>NULL=主要 / 否則=費用碼</td></tr>
+  </table>
+
+  <p>合併效益：開發維護單一規則檢索引擎；後台管理介面可一頁顯示所有規則並依類型過濾；將來新增 rule_type 不需新建資料表。</p>
+</div>
+
+<!-- ===== 五、後台規則管理介面 ===== -->
+<div class="section">
+  <h2>五、後台規則管理介面</h2>
+
+  <p>現行三張表沒有 UI 維護介面，新增/修改規則靠 IT 直接寫 SQL。從規則年代分布觀察：cust_express_payer 已 8 年無新增、spec 表 5 年無新增、custpayer 近 3 年僅 3 筆，極可能是「想改但沒人會改」造成的設定凍結。</p>
+
+  <div class="success-box">
+    <strong>建議新增功能</strong>
+    <ul>
+      <li>規則列表（依 rule_type / custom_no / station 篩選）</li>
+      <li>新增/編輯/停用規則（不刪除，保留 audit trail）</li>
+      <li>規則匹配模擬器：輸入一張假報單條件，系統列出哪幾條規則會命中、最終付款人是誰</li>
+      <li>規則健康度報告：每月寄信給 IT 主管，列出近 90 天 0 命中的規則</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== 六、規則使用統計面板 ===== -->
+<div class="section">
+  <h2>六、規則使用統計面板</h2>
+
+  <p>對 OP 主管或 IT 而言，目前無法回答「這條規則去年命中多少次？」這類問題。建議新系統在規則表加入「最近命中時間 / 累積命中次數」欄位。</p>
+
+  <h3>6.1 欄位設計建議</h3>
+  <table>
+    <tr><th>欄位</th><th>說明</th></tr>
+    <tr><td>last_hit_at</td><td>最近一次命中時間</td></tr>
+    <tr><td>hit_count_90d</td><td>近 90 天命中次數</td></tr>
+    <tr><td>hit_count_total</td><td>累積命中次數</td></tr>
+    <tr><td>created_by_name</td><td>建立者（顯式記錄人員，不只 user_id）</td></tr>
+    <tr><td>last_review_at</td><td>最近一次人工檢視時間</td></tr>
+  </table>
+
+  <p>實作方式：付款人配對引擎每命中一條規則時，async 寫一筆 hit log 到專屬資料表，每日定時批次彙總到規則表。命中查詢路徑與配對引擎解耦避免效能影響。</p>
+</div>
+
+<!-- ===== 七、AC_FLAG 鎖定後的可預覽機制 ===== -->
+<div class="section">
+  <h2>七、AC_FLAG 鎖定後的可預覽機制</h2>
+
+  <p>現行 AC_FLAG='Y' 後 Set_DeclPayer 直接 Exit，OP 看到的付款人是「鎖定當下的快照」。若上游規則或客戶設定變更，OP 無從察覺差異。</p>
+
+  <p>過去一年 95.3% 的報單為已計價鎖定狀態，這個機制是為了避免價格已通報後付款人被自動改掉。但建議新系統在「鎖定狀態」下仍能預覽 if 重算的結果，供 OP 判斷是否需要解鎖重新計算。</p>
+
+  <div class="success-box">
+    <strong>建議行為</strong>
+    <ul>
+      <li>付款人欄位在鎖定狀態旁邊顯示「重算預覽」按鈕</li>
+      <li>按下後不寫資料庫，只在 UI 顯示「依現行規則應為 X 客戶」</li>
+      <li>若預覽值與當前值不同，顯示差異提示（不強迫改）</li>
+      <li>OP 自行決定是否解鎖（DEC_RMK 改 N）並 trigger 重算</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== 八、A098/B001 等多碼合併方針 ===== -->
+<div class="section">
+  <h2>八、客戶代碼多碼釐清</h2>
+
+  <p>本次對照發現 custpayer 中存在多組客戶代碼指向同一公司，遷移到新系統時需明確處理：</p>
+  <table>
+    <tr><th>名稱</th><th>客戶代碼</th><th>規則數</th><th>備註</th></tr>
+    <tr><td>台積電</td><td>A098 / B001</td><td>4 / 11</td><td>A098=竹科廠 / B001=南科廠（地址驗證）</td></tr>
+    <tr><td>友達光電</td><td>A647 / C001</td><td>1 / 1</td><td>名稱完全相同，待五崧釐清差異</td></tr>
+    <tr><td>奇美電子</td><td>B021</td><td>10</td><td>名稱已標 [刪除]，全部 dead</td></tr>
+  </table>
+
+  <h3>建議遷移處理原則</h3>
+  <ol>
+    <li>若兩組代碼確實對應「不同廠別」（如 A098/B001），保留兩組 + 新增 parent_company 欄位串連</li>
+    <li>若兩組代碼是「歷史殘留」（如友達 A647/C001 待釐清），合併為單一代碼並建立舊→新 mapping</li>
+    <li>遷移時對 LRP custpayer 規則的 custom_no 一併調整為新代碼</li>
+  </ol>
+</div>
+
+<!-- ===== 結尾 ===== -->
+<div class="section">
+  <h2>遷移行動清單</h2>
+
+  <table>
+    <tr><th>#</th><th>行動</th><th>類別</th><th>對應現況章節</th></tr>
+    <tr><td>1</td><td>清理 21 條 custpayer dead 候選 + 7 條 82227x 殭屍</td><td><span class="tag tag-orange">優化</span></td><td>10.3 / 10.4</td></tr>
+    <tr><td>2</td><td>TPT_MODE 統一新碼，移除轉換層</td><td><span class="tag tag-orange">優化</span></td><td>3.3</td></tr>
+    <tr><td>3</td><td>VR_EXP 改顯式 enum（payer_resolution）</td><td><span class="tag tag-orange">優化</span></td><td>第八章</td></tr>
+    <tr><td>4</td><td>合併三表為單一 payer_rule 表 + rule_type enum</td><td><span class="tag tag-orange">優化</span></td><td>第五章</td></tr>
+    <tr><td>5</td><td>後台規則管理介面（含模擬器）</td><td><span class="tag tag-blue">新增</span></td><td>第十章 10.1</td></tr>
+    <tr><td>6</td><td>規則使用統計面板（last_hit / hit_count）</td><td><span class="tag tag-blue">新增</span></td><td>第十章</td></tr>
+    <tr><td>7</td><td>AC_FLAG 鎖定後重算預覽功能</td><td><span class="tag tag-blue">新增</span></td><td>第二章</td></tr>
+    <tr><td>8</td><td>客戶代碼多碼釐清（A098/B001 等）</td><td><span class="tag tag-orange">優化</span></td><td>10.6</td></tr>
+    <tr><td>9</td><td>保留 7 級瀑布優先順序（核心邏輯不變）</td><td><span class="tag tag-green">保留</span></td><td>第四章</td></tr>
+    <tr><td>10</td><td>保留 CUSTOM_NO/BS_NO 反轉規則（FT/G2/B1）</td><td><span class="tag tag-green">保留</span></td><td>3.1</td></tr>
+    <tr><td>11</td><td>保留 DHL→洋基自動轉換（CT 限定）</td><td><span class="tag tag-green">保留</span></td><td>3.2</td></tr>
+    <tr><td>12</td><td>保留費用代碼次配對流程</td><td><span class="tag tag-green">保留</span></td><td>第九章</td></tr>
+    <tr><td>13</td><td>保留 fallback 矩陣（精確→萬用順序）</td><td><span class="tag tag-green">保留</span></td><td>第六章</td></tr>
+    <tr><td>14</td><td>保留次要條件比對（BS_NO/ACRY_CMPID/TRANS_TYPE）</td><td><span class="tag tag-green">保留</span></td><td>第七章</td></tr>
+    <tr><td>15</td><td>保留快遞單付款人 fallback 到納稅義務人本人</td><td><span class="tag tag-green">保留</span></td><td>第四章</td></tr>
+  </table>
+
+  <p class="footnote">本報告對應現況報告為 3of4_繳款人配對_20260429.html。最終遷移範圍依五崧確認回覆調整。</p>
+</div>
+</div>
+
+</div>
+<script>
+function switchTab(t,b){
+  document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active')});
+  document.querySelectorAll('.tab-btn').forEach(function(e){e.classList.remove('active');e.classList.remove('active-green')});
+  document.getElementById('tab-'+t).classList.add('active');
+  b.classList.add(t==='optimize'?'active-green':'active');
+  window.scrollTo(0,document.querySelector('.tab-bar').offsetTop);
+}
+</script>
+</body>
+</html>
