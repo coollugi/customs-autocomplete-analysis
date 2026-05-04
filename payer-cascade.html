@@ -542,7 +542,7 @@
     <tr><td>A353</td><td>遠東金士頓</td><td class="num">4</td><td><span class="tag tag-green">活躍</span></td></tr>
     <tr><td>A662</td><td>松瑞製藥</td><td class="num">4</td><td><span class="tag tag-red">無報單</span></td></tr>
   </table>
-  <p>說明：A098 與 B001 兩個客戶代碼皆為「台積電」，分別對應竹科廠與南科廠。客戶端建議在新系統釐清是否需要拆兩組或合併。</p>
+  <p>說明：A098（台積電竹科廠）與 B001（台積電南科廠）兩個客戶代碼分別對應不同園區廠。新系統採 <code>CustomerBondedBranch</code> 設計（每個園區廠 = 獨立 branch），A098 / B001 自然拆兩個 branch，不需「合併或拆分」決策；193 條 custpayer 規則依 branch_id 自動分流。同名雙碼如 A647 / C001（友達光電）才需釐清歷史 mapping。詳見《報關系統 — 報單取號優化方案》§5.4 <code>CustomerBondedBranch</code> entity 職責。</p>
 </div>
 
 <!-- 十一、總結 -->
@@ -568,7 +568,7 @@
       <li>spec 表 3 筆規則過去一年命中為 0，是否仍要保留</li>
       <li>D999 費用代碼的用途（新系統是否仍需）</li>
       <li>cust_express_payer 8 年無新增、spec 5 年無新增，新增/維護流程是否仍存在</li>
-      <li>A098 / B001 兩個台積電代碼是否要在新系統釐清</li>
+      <li>A647 / C001 友達光電同名雙碼歷史 mapping 待釐清（A098 / B001 台積電已由 <code>CustomerBondedBranch</code> 設計處理）</li>
     </ol>
   </div>
 
@@ -793,12 +793,14 @@
     <tr><td>奇美電子</td><td>B021</td><td>10</td><td>名稱已標 [刪除]，全部 dead</td></tr>
   </table>
 
-  <h3>建議遷移處理原則</h3>
-  <ol>
-    <li>若兩組代碼確實對應「不同廠別」（如 A098/B001），保留兩組 + 新增 parent_company 欄位串連</li>
-    <li>若兩組代碼是「歷史殘留」（如友達 A647/C001 待釐清），合併為單一代碼並建立舊→新 mapping</li>
-    <li>遷移時對 LRP custpayer 規則的 custom_no 一併調整為新代碼</li>
-  </ol>
+  <h3>新系統處理原則 — <code>CustomerBondedBranch</code> 設計覆蓋</h3>
+  <p>新系統採用 <code>CustomerBondedBranch</code> 設計：一個 customer（公司）可有多個 branch（事業編號 / 保稅分支），每個 branch 綁固定園區與站別。三組客戶代碼的對照處理如下：</p>
+  <ul>
+    <li><strong>A098 / B001 台積電（不同園區廠）</strong> → A098 = 竹科廠 branch、B001 = 南科廠 branch，各為獨立 branch，<strong>不需合併</strong>。193 條 custpayer 規則 migration script 依 <code>branch_id</code> 自動分流，dimensions（DEP / DECL_TYPE / SCIAREA / TPT_MODE）保持不變。</li>
+    <li><strong>A647 / C001 友達光電（名稱完全相同）</strong> → 兩種可能性：(a) 兩個獨立 branch（類似 A098/B001 拆法，例如不同廠別）、(b) LRP 歷史殘留需合併為單一 branch。需五崧協助釐清歷史背景與對應園區。</li>
+    <li><strong>B021 奇美電子（名稱已標 [刪除]）</strong> → 10 條規則全部 dead，遷移時直接過濾，無需 branch 對應。</li>
+  </ul>
+  <p>SCIAREA_YN 維度可由 <code>branch.supervisionNo</code> 是否存在 derived（有監管編號 = 區內），custpayer 規則 dimensions 從 4 維減為 3 維。詳見《報關系統 — 報單取號優化方案》§5.4 <code>CustomerBondedBranch</code> entity 職責。</p>
 </div>
 
 <!-- ===== 結尾 ===== -->
@@ -814,7 +816,7 @@
     <tr><td>5</td><td>後台規則管理介面（含模擬器）</td><td><span class="tag tag-blue">新增</span></td><td>第十章 10.1</td></tr>
     <tr><td>6</td><td>規則使用統計面板（last_hit / hit_count）</td><td><span class="tag tag-blue">新增</span></td><td>第十章</td></tr>
     <tr><td>7</td><td>AC_FLAG 鎖定後重算預覽功能</td><td><span class="tag tag-blue">新增</span></td><td>第二章</td></tr>
-    <tr><td>8</td><td>客戶代碼多碼釐清（A098/B001 等）</td><td><span class="tag tag-orange">優化</span></td><td>10.6</td></tr>
+    <tr><td>8</td><td>友達 A647 / C001 歷史 mapping 釐清（A098 / B001 由 <code>CustomerBondedBranch</code> 設計覆蓋）</td><td><span class="tag tag-orange">優化</span></td><td>10.6 + 第八章</td></tr>
     <tr><td>9</td><td>保留 7 級瀑布優先順序（核心邏輯不變）</td><td><span class="tag tag-green">保留</span></td><td>第四章</td></tr>
     <tr><td>10</td><td>保留 CUSTOM_NO/BS_NO 反轉規則（FT/G2/B1）</td><td><span class="tag tag-green">保留</span></td><td>3.1</td></tr>
     <tr><td>11</td><td>保留 DHL→洋基自動轉換（CT 限定）</td><td><span class="tag tag-green">保留</span></td><td>3.2</td></tr>

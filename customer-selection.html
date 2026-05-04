@@ -381,6 +381,29 @@
 
 </div>
 
+
+<!-- ===== 十一、新系統 Branch 設計補充（2026-05-04 新增） ===== -->
+<div class="section">
+  <h2>十一、新系統 Branch 設計補充（2026-05-04）</h2>
+
+  <p>本報告 2026-04-21 release 後，與《報關系統 — 報單取號優化方案》§5.4 對齊：新系統客戶綁站不是綁「客戶（公司）」，而是綁 <code>CustomerBondedBranch</code>（內部以 <code>supervisionNo</code> 為 key）。同一公司若有多個園區廠會拆成多個 branch（例：台積電竹科廠 A098 / 南科廠 B001 為兩筆獨立 branch）。</p>
+
+  <p>本報告以下位置受此設計影響：</p>
+
+  <table>
+    <tr><th>位置</th><th>原描述</th><th>新系統實際行為</th></tr>
+    <tr><td>§2.1 <code>td_bfno</code>（從 CUSTOM）</td><td>監管編號（後續會被 CUSTOMDA 覆寫，見 2.3）</td><td>由 <code>branch.supervisionNo</code> 直接帶，不再經 CUSTOMDA 覆寫（覆寫鏈是 LRP 怪邏輯，新系統移除）</td></tr>
+    <tr><td>§2.2 CUSTDEP 帶入 5 欄</td><td>包裝描述 / cust_degree / 繳稅方式 / 案號 / 委任字號從 CUSTDEP 帶</td><td>5 欄歸 <code>CustomerBondedBranch</code> 屬性（CUSTDEP 本質就是 branch 表）</td></tr>
+    <tr><td>§2.4 監管欄位鎖定（DBEdit51）</td><td>若是園區客戶，DBEdit51 自動 disable</td><td>新系統選 branch 後 supervisionNo 強制由 branch 決定，UI 不需鎖定邏輯</td></tr>
+    <tr><td>§3.1 <code>BS_BFNO</code>（買賣方）</td><td>監管編號</td><td>= 買方 branch 的 supervisionNo</td></tr>
+    <tr><td>§3.3 監管欄位鎖定（DBEdit58）</td><td>同 §2.4</td><td>同上</td></tr>
+  </table>
+
+  <div style="margin-top:16px; padding:14px 18px; background:#eef6fb; border-left:4px solid #4a90c2; border-radius:6px; font-size:14px;">
+    <strong>📌 跨模組參考</strong><br>
+    詳見《報關系統 — 報單取號優化方案》§5.4 <code>CustomerBondedBranch</code> entity 職責 與 §3.7 海運站別辨識（補償方案）。確認表 Q1 (21 欄位) 子問詳見 v2 確認表。
+  </div>
+</div>
 <div id="tab-optimize" class="tab-content">
 
 <div class="section">

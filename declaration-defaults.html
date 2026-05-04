@@ -870,6 +870,12 @@
   <div class="success-box">
     <strong>核心原則</strong>：業務邏輯全部保留，技術實作全面現代化。凡是 LRP hardcode 在程式中的設定，新系統都改為管理介面可維護的設定表。
   </div>
+
+  <div style="margin-top:16px; padding:14px 18px; background:#eef6fb; border-left:4px solid #4a90c2; border-radius:6px; font-size:14px; line-height:1.7;">
+    <strong>📌 跨模組參考 — B1 / B2 / G2 報單例外（2026-05-04 補充）</strong><br>
+    本報告討論的「報關業者箱號 3 碼」（PLMPARM 信箱 014 / 367 / 194 / 543 / 310 / 312）適用於 G1 / G3 / G5 / G7 / B6 / B8 / B9 / D 系列 / F1 ∼ F5 / T1 / L1 等 11 種一般報單類別。<br>
+    <strong>B1 / B2 / G2</strong> 是例外：第 7-10 碼用「海關監管編號後 4 碼」（branch 級，由 <code>CustomerBondedBranch</code> 自動帶入），<strong>4 碼不是 3 碼，且不來自 PLMPARM</strong>。詳見《報關系統 — 報單取號優化方案》§3.7 海運站別辨識（補償方案）與 §5.4 <code>CustomerBondedBranch</code> entity 職責。
+  </div>
 </div>
 </div>
 
