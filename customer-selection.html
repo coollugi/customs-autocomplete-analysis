@@ -32,6 +32,11 @@
   .warning-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .success-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .orange-box { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box { background: #fff8e1; border-left: 4px solid #f9a825; padding: 16px 20px; margin: 20px 0 24px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box::before { content: "📌 業務白話摘要"; display: block; font-weight: 700; color: #b27300; margin-bottom: 8px; font-size: 14px; }
+  .tldr-box p { color: var(--gray-700); margin-bottom: 8px; }
+  .tldr-box ul { margin: 8px 0 8px 20px; }
+  .tldr-box li { margin-bottom: 4px; color: var(--gray-700); }
   table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
   th { background: var(--gray-100); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200); white-space: nowrap; }
   td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); vertical-align: top; }
@@ -119,6 +124,17 @@
 
 <div class="section">
   <h2>二、選納稅義務人 — 21 欄位完整清單</h2>
+
+  <div class="tldr-box">
+    <p>OP 選了納稅義務人後，系統自動帶入 <strong>21 個欄位</strong>，分 3 段：</p>
+    <ul>
+      <li><strong>客戶主檔 8 欄</strong>：統編、英中名稱、英中地址、驗證號碼、監管編號</li>
+      <li><strong>客戶部門設定 5 欄</strong>：包裝描述、繳納方式、案號、長期委任字號（其中「客戶信任等級」<strong>0% 客戶有設</strong>，建議砍）</li>
+      <li><strong>客戶聯絡人 4 欄</strong>：聯絡人姓名、電話、傳真、業務代碼（多筆會跳視窗讓 OP 挑）</li>
+    </ul>
+    <p>⚠️ 注意：聯絡人有「<strong>監管編號</strong>」欄位會<strong>覆寫客戶主檔的監管編號</strong> — 這條跟取號 spec v3.6 的 B1/B2/G2 監管編號來源連動。</p>
+  </div>
+
   <p>OP 在報單第 6 欄「納稅義務人」輸入客戶代碼後（事件：<code>FII020_CPT.pas DBEdit6Exit L3210-3289</code>），LRP 依序執行以下動作：</p>
 
   <h3>2.1 從 CUSTOM 客戶主檔帶入 8 欄</h3>
@@ -177,6 +193,16 @@
 
 <div class="section">
   <h2>三、選買方/賣方 — 8 欄位</h2>
+
+  <div class="tldr-box">
+    <p>選買方/賣方時系統帶 7 個欄位（國家代碼、統編、監管編號、英中名稱地址）。<strong>連鎖效果</strong>：買方一變，繳款人也要重算（因為 7 級瀑布把買方當條件之一）。</p>
+    <p>⚠️ 兩個特殊邏輯：</p>
+    <ul>
+      <li><strong>運輸方式 = 99（國內）</strong>時，會額外把客戶的「包裝描述」追加到報單「其他申報事項」</li>
+      <li><strong>找不到客戶</strong>時（例如海外公司沒建檔），系統會把 OP 輸入的字串<strong>當作「外部統編」</strong>用，不強制要求客戶資料存在 — 讓海外公司報單可以走，但也讓「找不到客戶」訊息變成可忽略警告</li>
+    </ul>
+  </div>
+
   <p>OP 在報單第 53 欄「買方/賣方」輸入客戶代碼後（事件：<code>FII020_CPT.pas DBEdit53Exit L3304-3338</code>）：</p>
 
   <h3>3.1 從 CUSTOM 帶入 7 欄</h3>
@@ -208,6 +234,11 @@
 
 <div class="section">
   <h2>四、選收貨人 — 7 欄位</h2>
+
+  <div class="tldr-box">
+    <p>選收貨人時系統帶 6 個基本欄位 + 1 個條件欄位「驗證號碼」。<strong>收貨人是 4 個客戶角色裡最簡單的</strong> — 沒有任何連鎖觸發，不重算繳款人、不同步其他欄位。純粹拉客戶資料。</p>
+  </div>
+
   <p>OP 在報單第 157 欄「收貨人」輸入客戶代碼後（事件：<code>FII020_CPT.pas DBEdit157Exit L6515-6534</code>）：</p>
 
   <table>
@@ -228,6 +259,17 @@
 
 <div class="section">
   <h2>五、客戶料號帶入 — 13+ 欄位（Read_LH）</h2>
+
+  <div class="tldr-box">
+    <p>項次層 OP 輸入「客戶料號」後，系統<strong>一口氣帶入 19+ 個欄位</strong>：</p>
+    <ul>
+      <li><strong>13 行貨名</strong>（每行一格）</li>
+      <li><strong>稅則 + 商品分類 + 品牌 + 統計方式 + 單價 + 生產國別（僅進口）+ 數量單位</strong></li>
+      <li><strong>連鎖效果</strong>：稅則一變，自動再去查稅率 / 單位 / 簽證代號（共 19+ 欄位）</li>
+    </ul>
+    <p>對 OP 來說「<strong>打料號 = 半張項次自動填好</strong>」，是項次填寫最核心的 AutoComplete。</p>
+  </div>
+
   <p>項次層裡 OP 輸入「客戶料號」後（進口事件：<code>FII020_CPT.pas S02Exit L5376-5387</code>，出口事件：<code>FEI020_CPT.pas S02Exit L4758-4769</code>），LRP 呼叫 <code>Pub_Func.Read_LH</code>（<code>PUB_FUNC.pas L2728-2789</code>）查詢 PLMIDCC 表，一口氣帶入 13 行貨名 + 多個項次屬性。</p>
 
   <h3>5.1 PLMIDCC 查詢條件</h3>
@@ -335,6 +377,15 @@
 
 <div class="section">
   <h2>八、進口 vs 出口 模組差異</h2>
+
+  <div class="tldr-box">
+    <p>進口（FII020）跟出口（FEI020）是兩支獨立的報單畫面，但 AutoComplete 邏輯幾乎相同。<strong>主要差異</strong>：</p>
+    <ul>
+      <li><strong>同一個料號代碼可進口出口各一筆</strong>（同名 IC「ABC123」進口版稅則 / 單價 / 品牌可以跟出口版不同）</li>
+      <li>進口才帶「生產國別」，出口程式寫死跳過</li>
+    </ul>
+    <p>新系統設計決策題：要不要<strong>合併進出口主檔</strong>？兩個選項：(A) 沿用兩張表（進出口屬性可差很大）/ (B) 改一張表 + type 欄位（schema 簡化但要評估屬性差異）</p>
+  </div>
   <p>FII020_CPT（進口）與 FEI020_CPT（出口）是兩支獨立的報單畫面，但 AutoComplete 邏輯幾乎相同。差異整理：</p>
   <table>
     <tr><th>項目</th><th>進口 FII020_CPT</th><th>出口 FEI020_CPT</th></tr>
@@ -385,6 +436,17 @@
 <!-- ===== 十一、新系統 Branch 設計補充（2026-05-04 新增） ===== -->
 <div class="section">
   <h2>十一、新系統 Branch 設計補充（2026-05-04）</h2>
+
+  <div class="tldr-box">
+    <p>同一個客戶有<strong>多個分公司 / 廠區</strong>（例如台積電 fab12 新竹 / fab15 中科 / fab18 南科），現在 LRP 只有一個客戶主檔 + 部分用 CUSTDEP 部門設定。新系統設計「<strong>CustomerBondedBranch</strong>」每個事業編號一筆，自己有監管編號 + 對應站別。</p>
+    <p>OP 打報單時<strong>選 branch 就一次帶站別 + 監管編號</strong>，避免現在「同客戶不同廠區監管編號搞錯」的情況。這個設計同時對齊：</p>
+    <ul>
+      <li>取號 spec §3.7（B1/B2/G2 監管編號從 branch 來）</li>
+      <li>包 1 Q12（CT A/B/C 客戶代碼第一碼決定到站別）</li>
+      <li>包 2 監管編號修正（B1/G2 用 bs_bfno、B2 用 td_bfno）</li>
+      <li>包 3 友達光電 A647/C001 那題（同名雙碼是不同 branch 還是歷史殘留）</li>
+    </ul>
+  </div>
 
   <p>本報告 2026-04-21 release 後，與《報關系統 — 報單取號優化方案》§5.4 對齊：新系統客戶綁站不是綁「客戶（公司）」，而是綁 <code>CustomerBondedBranch</code>（內部以 <code>supervisionNo</code> 為 key）。同一公司若有多個園區廠會拆成多個 branch（例：台積電竹科廠 A098 / 南科廠 B001 為兩筆獨立 branch）。</p>
 
@@ -481,6 +543,15 @@
 
 <div class="section">
   <h2>四、客戶料號的「進出口分流」資料模型決策</h2>
+
+  <div class="tldr-box">
+    <p>LRP 進出口料號分兩張表（同代碼可有兩筆）。新系統<strong>兩個選項</strong>：</p>
+    <ul>
+      <li><strong>(A) 沿用兩張表</strong> — 進出口屬性可以差很大（同 IC 進口免稅出口要稅）</li>
+      <li><strong>(B) 改一張表 + type 欄位</strong> — schema 簡化但要評估屬性差異</li>
+    </ul>
+    <p>設計決策題等業務拍板。</p>
+  </div>
   <h3>4.1 LRP 現況</h3>
   <p>PLMIDCC 用 3 個 key：<code>(custom_no, in_exp, id_no)</code> — 同一個料號代碼可以在進口（'I'）和出口（'E'）各存一筆，內容（稅則/單價/品牌）可以不同。</p>
   <p>DB 實證：248,040 筆進口 + 204,071 筆出口 = 45.2 萬。Top 客戶 B010 進口 10.4 萬 + 出口 10.2 萬 — 進出口幾乎對半。</p>
