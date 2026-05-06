@@ -32,6 +32,11 @@
   .warning-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .success-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .orange-box { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box { background: #fff8e1; border-left: 4px solid #f9a825; padding: 16px 20px; margin: 20px 0 24px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box::before { content: "📌 業務白話摘要"; display: block; font-weight: 700; color: #b27300; margin-bottom: 8px; font-size: 14px; }
+  .tldr-box p { color: var(--gray-700); margin-bottom: 8px; }
+  .tldr-box ul { margin: 8px 0 8px 20px; }
+  .tldr-box li { margin-bottom: 4px; color: var(--gray-700); }
   table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
   th { background: var(--gray-100); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200); white-space: nowrap; }
   td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); }
@@ -94,6 +99,11 @@
 
 <div class="section">
   <h2>一、預設值的運作機制</h2>
+
+  <div class="tldr-box">
+    <p>OP 開新報單時，系統根據「<strong>站別 + 業務別 + 區內外</strong>」三個條件，從預設值參數表（PLMPARM）自動帶入 <strong>50+ 個欄位</strong>（信箱、專責人員、運輸方式、裝出口岸等）— OP 不用手動填這些重複資料。</p>
+    <p>新系統規劃把 PLMPARM 從「字串位置切片」（容易出錯）改成<strong>結構化欄位</strong>（直觀好維護）— 詳見優化建議第一章。</p>
+  </div>
 
   <h3>OP 開新報單時發生了什麼？</h3>
   <p>OP 選擇業務別（空/海運、進/出口）後，系統根據<strong>三個條件</strong>自動決定要載入哪一組預設值：</p>
@@ -347,6 +357,19 @@
 <div class="section">
   <h2>四、客戶偏好自動帶入 — 數據分析</h2>
 
+  <div class="tldr-box">
+    <p>有 5 個欄位 LRP <strong>沒有按客戶帶入</strong>，但 DB 實證每個客戶<strong>有自己的固定偏好</strong>（top-1 命中率 67%~96%）：</p>
+    <ul>
+      <li>裝貨地點 96.0% — 例如某客戶 96% 報單都從桃園出發</li>
+      <li>幣別 90.7% — 例如某客戶 90% 用美元</li>
+      <li>貿易條件 82.3%</li>
+      <li>裝卸貨港口 74.6%</li>
+      <li>卸存地 67.1%</li>
+    </ul>
+    <p><strong>命中率是「per-customer」算的</strong>（每個客戶看自己的歷史），<strong>不是把所有客戶混在一起算</strong> — 換句話說：新客戶（不論行業）進來看他自己歷史就會對齊他自己，<strong>不會繼承其他客戶的偏好</strong>。</p>
+    <p>新系統建議用<strong>客戶級</strong>（不是行業級）的雙軌設計：方案 A 客戶主檔設預設 + 方案 B 客戶歷史學習。詳見優化建議第二章。</p>
+  </div>
+
   <div class="warning-box">
     <strong>現況問題</strong>：LRP 在建單時，以下 5 個欄位只會帶入「通用預設值」（依關別或固定值），<strong>不會根據客戶自動帶入</strong>。但從近一年報單資料分析，客戶對這些欄位有非常明確的偏好 — 如果自動帶入客戶最常用的值，大量報單根本不需要 OP 手動修改。
   </div>
@@ -439,6 +462,16 @@
 <div class="section">
   <h2>六、運輸方式碼（TPT_MODE）— 新舊格式並存</h2>
 
+  <div class="tldr-box">
+    <p>運輸方式編碼從 <strong>1 碼舊規 → 2 碼新規</strong> 演進。實測：</p>
+    <ul>
+      <li>2017 年後<strong>幾乎全面使用 2 碼</strong>（年 27 萬筆）</li>
+      <li>1 碼僅剩每年 ~133 筆極少數例外</li>
+      <li>但 LRP 的帳單對照表（CUSTBILLTO）還是用舊 1 碼，所以有個「2 碼 → 1 碼」的轉換層</li>
+    </ul>
+    <p>新系統建議統一用 2 碼，移除轉換層。</p>
+  </div>
+
   <p>運輸方式碼在 2015~2016 年間從 <strong>1 碼（舊）</strong>切換為<strong> 2 碼（新/關港貿 CPT 格式）</strong>。2017 年後幾乎全面使用 2 碼。</p>
 
   <h3>新舊碼對照表</h3>
@@ -476,6 +509,12 @@
 
 <div class="section">
   <h2>七、費用自動產生</h2>
+
+  <div class="tldr-box">
+    <p>系統根據「<strong>業務別 + 區內外</strong>」自動產生對應的費用碼項目（D102 報關費 / D104 EDI / D112 加頁 / T101 聯運 / T102 園區送貨 等共 12 個費用碼），OP 不用手動加。</p>
+    <p>⚠️ 五崧已釐清：<strong>T101 跟 T102 不是取代關係</strong>，是兩件不同事 — T101=有開單叫車（TRNSND 表）、T102=沒開單但業務收費。新系統需要區分這兩種觸發路徑。</p>
+    <p>D112 加頁費規則新系統建議改為<strong>從客戶報價單帶</strong>（STDQTMX/STDQTDX）— 95% 客戶用「前 N 頁免費」，例外有以項次/封包計。</p>
+  </div>
 
   <h3>費用矩陣</h3>
   <table>
@@ -524,6 +563,16 @@
 
 <div class="section">
   <h2>九、欄位變更連動規則</h2>
+
+  <div class="tldr-box">
+    <p>OP 改某個欄位時，系統會「<strong>連動更新</strong>」其他相關欄位（避免 OP 手動同步多個欄位忘東忘西）。例如：</p>
+    <ul>
+      <li><strong>選報單類別</strong> → 自動鎖第 3-4 碼 + 帶相關預設值</li>
+      <li><strong>選關別</strong> → 自動帶倉庫 → 自動帶提貨地（三層連動）</li>
+      <li><strong>選運輸方式</strong> → 影響費用碼 + 聯運計算</li>
+    </ul>
+    <p>新系統建議把<strong>三層連動簡化為直接選倉庫帶提貨地</strong>（省掉中間關別層）— 因 LRP 三層是因為舊 UI 沒有直接選倉庫的功能，新 UI 可直接提供倉庫下拉選單。</p>
+  </div>
 
   <h3>9.1 報單類別變更</h3>
   <table>
@@ -650,6 +699,16 @@
 <div class="section">
   <h2>二、客戶偏好自動帶入（數據驅動新功能）</h2>
 
+  <div class="tldr-box">
+    <p>LRP 沒做但 OP 想要的功能 — 系統根據<strong>每個客戶自己的歷史</strong>自動帶 5 個偏好欄位（裝貨地、幣別、貿易條件、裝卸貨港、卸存地）。</p>
+    <p>建議<strong>雙軌設計</strong>：</p>
+    <ul>
+      <li><strong>方案 A：客戶主檔設預設</strong> — 業務跟客戶談好的固定值（例如某客戶就是 EXW + USD），主檔寫死</li>
+      <li><strong>方案 B：客戶歷史學習</strong> — 系統自動算「該客戶最近 N 次都用什麼」，動態建議</li>
+    </ul>
+    <p>⚠️ <strong>per-customer 算</strong>不是 per-行業 算 — 新客戶（不論行業）進來看自己的歷史，<strong>不繼承其他客戶的偏好</strong>。</p>
+  </div>
+
   <div class="highlight-box">
     <strong>核心發現</strong>：LRP 在建單時有 5 個欄位只帶「通用預設值」，不會根據客戶帶入。但近一年報單資料分析顯示，客戶對這些欄位有非常明確的偏好。如果自動帶入客戶最常用的值，<strong>平均 67%~96% 的報單不需要 OP 手動修改</strong>。
   </div>
@@ -724,6 +783,11 @@
 <div class="section">
   <h2>四、費用自動產生可設定化</h2>
 
+  <div class="tldr-box">
+    <p>現在費用矩陣寫死在 LRP 程式碼裡（業務別×區內外×費用碼 12 條對應），改規則要動程式。新系統把這些規則改成<strong>後台可設定的對照表</strong> — 業務想加新費用碼或調規則，IT 不用動程式碼。</p>
+    <p>D112 加頁費也同樣可設定化（規則從客戶報價單 STDQTMX/STDQTDX 帶）。</p>
+  </div>
+
   <div class="comparison-grid">
     <div class="comparison-card old">
       <h4>LRP 現行做法</h4>
@@ -794,6 +858,12 @@
 
 <div class="section">
   <h2>六、轉口報單特殊規則優化</h2>
+
+  <div class="tldr-box">
+    <p>LRP 把<strong>空運公司對照表寫死在程式碼</strong>（CTI020_CPT.pas Set_Aircmp 函式 L541-599） — 8 組關鍵字對應公司代碼（日通 / 洋基 / UPS / FedEx / 浩威 / 永通 / DHL ...）。要新增業者要動程式。</p>
+    <p>新系統改為<strong>對照表維護</strong>（後台可加減），新空運公司進來時 OP 手動選 TRANS_TYPE='五崧捷運' 即可，不用工程師上場。</p>
+    <p>2025 實際只有 2 組仍活（洋基快遞單 + UPS 自轉），其餘 6 組過去一年 0 命中（建議改 standby 不刪）。</p>
+  </div>
 
   <h3>4.1 客戶代碼首碼 &rarr; 到站別 — 建議改為主檔設定</h3>
   <div class="comparison-grid">

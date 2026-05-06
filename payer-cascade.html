@@ -32,6 +32,11 @@
   .warning-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .success-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
   .orange-box { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box { background: #fff8e1; border-left: 4px solid #f9a825; padding: 16px 20px; margin: 20px 0 24px 0; border-radius: 0 8px 8px 0; }
+  .tldr-box::before { content: "📌 業務白話摘要"; display: block; font-weight: 700; color: #b27300; margin-bottom: 8px; font-size: 14px; }
+  .tldr-box p { color: var(--gray-700); margin-bottom: 8px; }
+  .tldr-box ul { margin: 8px 0 8px 20px; }
+  .tldr-box li { margin-bottom: 4px; color: var(--gray-700); }
   table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
   th { background: var(--gray-100); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--gray-200); white-space: nowrap; }
   td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); vertical-align: top; }
@@ -130,6 +135,12 @@
 <!-- 二、觸發時機與整體流程 -->
 <div class="section">
   <h2>二、觸發時機與整體流程</h2>
+
+  <div class="tldr-box">
+    <p>報單上 <strong>11 個欄位變動</strong>會觸發繳款人重算 — 包括選納稅義務人、選買方/賣方、選空運公司、勾 FreeHouse、選報單類別、選運輸方式、按保稅按鈕、按儲存等。OP 每改其中一個欄位，系統都會重新跑 7 級瀑布。</p>
+    <p>但<strong>過去一年 95.3% 報單在編輯後就被「計價鎖定」</strong> — 鎖定後 OP 改客戶/類別不會重跑（避免覆蓋已收費的數字）。新建報單時這套機制 <strong>100% 跑過一次</strong>，所以是「建單後 mute」不是「一直 mute」。新系統建議補一個「<strong>預覽</strong>」按鈕，鎖定後 OP 仍可看「依現行規則應該是誰付」。</p>
+  </div>
+
   <p>程式中共 11 處呼叫 Set_DeclPayer，分布在以下事件上：</p>
 
   <table>
@@ -165,6 +176,18 @@
 <!-- 三、前置處理 -->
 <div class="section">
   <h2>三、前置處理（4 項自動轉換）</h2>
+
+  <div class="tldr-box">
+    <p>進入 7 級瀑布前系統會先做 4 件 <strong>OP 看不到的事</strong>：</p>
+    <ul>
+      <li><strong>① 特殊情境（轉運 / 進倉退關）下交換納稅義務人 ↔ 交易對象</strong>：邏輯上「真正的付款方」跟報單上寫的不同，系統幫 OP 換好再查</li>
+      <li><strong>② DHL → 洋基快遞單</strong>（CT 轉運限定）：因實務上洋基代理 DHL，配對表只用洋基那條規則</li>
+      <li><strong>③ 2 碼新運輸方式碼 → 1 碼舊碼</strong>：為了相容 LRP 舊規則表，查表前自動轉換（新系統會一次轉換完移除這層）</li>
+      <li><strong>④ 海空運進出口報單偷偷找對應的轉運報單</strong>，把運輸類別撈出來幫忙比對</li>
+    </ul>
+    <p>這些都是系統內部處理，OP 完全感受不到。</p>
+  </div>
+
   <p>進入 7 級瀑布前，系統會先做幾項欄位轉換，這些轉換對 OP 來說透明，但會影響後續配對結果。</p>
 
   <h3>3.1 CUSTOM_NO ↔ BS_NO 自動反轉</h3>
@@ -205,6 +228,20 @@
 <!-- 四、7 級瀑布 -->
 <div class="section">
   <h2>四、7 級優先瀑布</h2>
+
+  <div class="tldr-box">
+    <p>報單付款人怎麼決定？系統按以下順序找，<strong>找到就停</strong>：</p>
+    <ul>
+      <li><strong>1️⃣ OP 手動指定</strong>（系統一律尊重，不再覆蓋）</li>
+      <li><strong>2️⃣ 特殊空運公司設定</strong>（共 3 條精細到 5 個條件的規則）</li>
+      <li><strong>3️⃣ FreeHouse 服務 / EXW 出口</strong>（買方付運費條款）→ 付款人 = 空運公司</li>
+      <li><strong>4️⃣ 勾了「合作外銷」</strong> → 付款人 = 合作外銷對象（保稅廠商）</li>
+      <li><strong>5️⃣ 常態配對表命中</strong>（依進出口 / 海空 / 區內外 / 運輸方式組合查）</li>
+      <li><strong>6️⃣ 快遞配對表命中</strong>（用「空運公司」查，不像順位 5 是查客戶）</li>
+      <li><strong>7️⃣ 都沒命中</strong> → 付款人 = 納稅義務人本人（fallback）</li>
+    </ul>
+  </div>
+
   <p>系統依以下順序判斷主要付款人，前面的規則先命中就停止，不再往下找：</p>
 
   <div class="cascade-step">
@@ -284,6 +321,16 @@
 <!-- 五、三張配對表 -->
 <div class="section">
   <h2>五、三張配對表結構</h2>
+
+  <div class="tldr-box">
+    <p>193 條規則分散在 3 張表，<strong>邏輯上是同一件事</strong>「誰付這筆錢」：</p>
+    <ul>
+      <li><strong>常態配對表 109 條</strong> — 用「客戶+站」查，比對進出口/海空/區內外/運輸方式組合</li>
+      <li><strong>快遞配對表 81 條</strong> — 用「空運公司+站」查，只比對進出口/海空/區內外</li>
+      <li><strong>特殊配對表 3 條</strong> — 用 5 個條件比對（最精細）</li>
+    </ul>
+    <p>新系統建議<strong>合併成 1 張規則表</strong>（保留 view 對應到舊三表，舊系統 query 不會壞），漸進遷移。</p>
+  </div>
 
   <table>
     <tr>
@@ -424,6 +471,11 @@
 <!-- 八、VR_EXP -->
 <div class="section">
   <h2>八、VR_EXP 虛擬付款人機制</h2>
+
+  <div class="tldr-box">
+    <p>「VR_EXP」是 LRP source code 寫死的內部標記，<strong>意思是「付款人 = 報單裡的納稅義務人本人，不用再查」</strong>。特殊配對表 3 條規則用到這個標記。</p>
+    <p>新系統會改用<strong>清楚的欄位名</strong>（例如 <code>付款人=客戶本人? Y/N</code>），讓 OP / 業務看欄位就懂在做什麼，不用查 source code。</p>
+  </div>
   <p>spec 表的 PAYER_ID 欄位有一個特殊值 <code>VR_EXP</code>，並非真正的客戶代碼，而是一個虛擬標記。</p>
 
   <div class="highlight-box">
@@ -475,6 +527,16 @@
 <!-- 十、規則使用情況分析 -->
 <div class="section">
   <h2>十、規則使用情況分析</h2>
+
+  <div class="tldr-box">
+    <p>193 條規則跑了 13 年，有些已經不再有客戶用 — <strong>但沒人發現也沒人砍</strong>：</p>
+    <ul>
+      <li><strong>21 條 dead 候選</strong>（19.3%）：[刪除]奇美電子 10 條（客戶名已標刪除）+ 6 家其他客戶過去一年 0 報單</li>
+      <li><strong>7 條永通殭屍</strong>：客戶代碼欄位「82227x」是 typo（永通正確代碼是 82227 沒 x），13 年 0 命中</li>
+      <li><strong>91% 規則的「運輸方式」維度設成「不限」</strong> — 表示這個維度幾乎沒人在用</li>
+    </ul>
+    <p>新系統建議補「<strong>規則使用統計面板</strong>」 — 每條規則顯示最後命中日期、近 90 天命中次數，每月寄信給 IT 主管列出 0 命中規則。</p>
+  </div>
 
   <h3>10.1 規則建立年代分布</h3>
   <p>三表規則絕大多數設定於 2009-2017，近 8 年新增極少：</p>
@@ -594,6 +656,15 @@
 <div class="section">
   <h2>一、清理 dead rule</h2>
 
+  <div class="tldr-box">
+    <p>過去一年 0 命中的規則合計 28 條（21 條一般客戶 + 7 條永通 typo）。建議：</p>
+    <ul>
+      <li><strong>archive 不直接刪</strong>：新系統開個「停用標記」（is_active=false），保留資料 6 個月</li>
+      <li>6 個月內無回流再正式 purge</li>
+      <li><strong>留可逆路徑</strong>，避免誤殺活的</li>
+    </ul>
+  </div>
+
   <div class="warning-box">
     <strong>193 條規則中至少 28 條近一年無命中</strong>
     <p>清理 SQL 計算依據：custpayer 21 條（19.3%）+ cust_express_payer 7 條（8.6%）= 28 條，近一年的命中數：</p>
@@ -636,6 +707,16 @@
 <!-- ===== 二、TPT_MODE 統一新碼 ===== -->
 <div class="section">
   <h2>二、TPT_MODE 統一為新碼，移除轉換層</h2>
+
+  <div class="tldr-box">
+    <p>運輸方式編碼從 <strong>1 碼舊規 → 2 碼新規</strong>。實測：</p>
+    <ul>
+      <li>報單實務 2017 年後全部用 2 碼（年 27 萬筆）</li>
+      <li>常態配對表 99 條規則中只有 <strong>10 條真的指定到「特定 1 碼」</strong></li>
+      <li>其他 89 條都寫「不限運輸方式」（萬用值）</li>
+    </ul>
+    <p>新系統把那 10 條<strong>直接 1 對 1 換</strong>成新碼（例：「TPT_MODE=3 空運」→「TPT_MODE 為 41/42/43/44/52 任一」），舊系統既有報單<strong>保留 view 兩套並存</strong>過渡期。</p>
+  </div>
 
   <p>現行 LRP 同時維護新舊兩套運輸方式碼，Set_DeclPayer 內呼叫 Trans_TPT_MODE_to_OLD 把新碼轉舊碼後查 custpayer，但條件判斷「TPT_MODE&lt;&gt;'42'」又比對的是新碼，新舊並存增加維護成本。</p>
 
@@ -696,6 +777,15 @@
 <!-- ===== 四、合併三表為單一規則表 ===== -->
 <div class="section">
   <h2>四、三張配對表合併為單一規則表</h2>
+
+  <div class="tldr-box">
+    <p>現在 3 張表（109+81+3 = 193 條規則）邏輯上是<strong>同一件事</strong>。整併方式：</p>
+    <ul>
+      <li>合成 1 張規則表 + 多一個 type 欄位區分「常態 / 快遞 / 特殊」</li>
+      <li><strong>舊系統 query 不會壞</strong>（保留 view 對應到新單表）</li>
+      <li>漸進遷移，先讀新表後寫舊表，最終全切到新表</li>
+    </ul>
+  </div>
 
   <p>現行三表結構雷同（皆為 維度 + 次要條件 + payer_id），但欄位不一致、fallback 維度數量也不同。新系統可合併為一張規則表 + 規則類型 enum。</p>
 
@@ -765,6 +855,15 @@
 <!-- ===== 七、AC_FLAG 鎖定後的可預覽機制 ===== -->
 <div class="section">
   <h2>七、AC_FLAG 鎖定後的可預覽機制</h2>
+
+  <div class="tldr-box">
+    <p>現在報單一旦計價鎖定，OP 看不到當初 7 級瀑布怎麼跑的（只看到結果）。新系統補一個「<strong>預覽</strong>」按鈕：</p>
+    <ul>
+      <li>OP 隨時能看到付款人是哪一級命中、命中哪一條規則</li>
+      <li>解決 95.3% 鎖定後的<strong>黑盒子問題</strong></li>
+      <li>OP 自己決定要不要解鎖重算</li>
+    </ul>
+  </div>
 
   <p>現行 AC_FLAG='Y' 後 Set_DeclPayer 直接 Exit，OP 看到的付款人是「鎖定當下的快照」。若上游規則或客戶設定變更，OP 無從察覺差異。</p>
 
