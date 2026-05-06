@@ -312,7 +312,7 @@
     <p>五崧內部整理的順位 5 文件描述完全吻合本份逆向結果，僅是順位 1-7 的順序與條件描述方式略有不同。本報告主要補充：</p>
     <ul>
       <li>每個順位的「次要條件」與「fallback 矩陣」如何運作</li>
-      <li>順位 2 與順位 6 的差別（spec 表 vs 主表）</li>
+      <li>順位 2 與順位 6 的差別（特殊配對表 vs 主表）</li>
       <li>順位 5 / 6 失敗時系統如何往下走，而非「立即跳到順位 7」</li>
     </ul>
   </div>
@@ -397,7 +397,7 @@
     <tr><td>2</td><td>82178 洋基</td><td>AJ100 / CI / XX / Y 區內</td><td>洋基快遞單</td><td>A353 遠東金士頓</td><td>82178 洋基</td></tr>
     <tr><td>3</td><td>82178 洋基</td><td>AJ100 / CI / XX / Y 區內</td><td>洋基快遞單</td><td>XXXXX 萬用</td><td>VR_EXP 虛擬</td></tr>
   </table>
-  <p>spec 表的設計語意：對洋基（82178），當報單為竹科進口區內 + 洋基快遞單時，若報單貨主是 A098 或 A353，付款人=洋基；其他客戶 fallback 到「VR_EXP=該客戶本人」。詳見第 8 章。</p>
+  <p>特殊配對表的設計語意：對洋基（82178），當報單為竹科進口區內 + 洋基快遞單時，若報單貨主是 A098 或 A353，付款人=洋基；其他客戶 fallback 到「VR_EXP=該客戶本人」。詳見第 8 章。</p>
 </div>
 
 <!-- 六、fallback 矩陣 -->
@@ -429,7 +429,7 @@
   <p class="footnote">PUB_PROC.pas L4512-4561（lcSeek_Detial_Express）</p>
 
   <h3>6.3 cust_express_payer_spec：5 維 32 組合</h3>
-  <p>spec 表多兩個維度（轉運方式、指定貨主），共 2⁵ = 32 種組合：</p>
+  <p>特殊配對表多兩個維度（轉運方式、指定貨主），共 2⁵ = 32 種組合：</p>
   <table>
     <tr><th>維度</th><th>精確值</th><th>萬用值</th></tr>
     <tr><td>DEP</td><td>CI / CE ...</td><td>XX</td></tr>
@@ -465,7 +465,7 @@
     <tr><th>欄位</th><th>判斷</th></tr>
     <tr><td>TRANS_TYPE</td><td>僅當 DEP=CT 時比對；若規則此欄位有值，必須等於本報單轉換後的 TRANS_TYPE 才視為命中</td></tr>
   </table>
-  <p>注意：spec 表 5 維中本身就有 TRANS_TYPE 維度（會跑 fallback），這個「次要條件比對」是在進入 lcSeek_Detial 後額外的二次檢查（基本上重複）。</p>
+  <p>注意：特殊配對表 5 維中本身就有 TRANS_TYPE 維度（會跑 fallback），這個「次要條件比對」是在進入 lcSeek_Detial 後額外的二次檢查（基本上重複）。</p>
 </div>
 
 <!-- 八、VR_EXP -->
@@ -476,15 +476,15 @@
     <p>「VR_EXP」是 LRP source code 寫死的內部標記，<strong>意思是「付款人 = 報單裡的納稅義務人本人，不用再查」</strong>。特殊配對表 3 條規則用到這個標記。</p>
     <p>新系統會改用<strong>清楚的欄位名</strong>（例如 <code>付款人=客戶本人? Y/N</code>），讓 OP / 業務看欄位就懂在做什麼，不用查 source code。</p>
   </div>
-  <p>spec 表的 PAYER_ID 欄位有一個特殊值 <code>VR_EXP</code>，並非真正的客戶代碼，而是一個虛擬標記。</p>
+  <p>特殊配對表的 PAYER_ID 欄位有一個特殊值 <code>VR_EXP</code>，並非真正的客戶代碼，而是一個虛擬標記。</p>
 
   <div class="highlight-box">
-    <strong>機制：</strong>當 spec 表規則命中且 PAYER_ID='VR_EXP' 時，系統會把 PAYER_ID 替換為「當前報單的納稅義務人 CUSTOM_NO」。
+    <strong>機制：</strong>當 特殊配對表規則命中且 PAYER_ID='VR_EXP' 時，系統會把 PAYER_ID 替換為「當前報單的納稅義務人 CUSTOM_NO」。
     <p class="footnote" style="margin-top:8px; padding-top:0; border:none;">PUB_PROC.pas L4613</p>
   </div>
 
   <h3>8.1 為什麼需要這個機制？</h3>
-  <p>spec 表的 5 維設計中，DEC_CUSTOM_NO 維度可以填萬用值 <code>XXXXX</code>。但若規則設「當條件命中時，付款人=任何客戶都用 X 客戶」這種寫法，無法表達「付款人=該客戶自己」這種語意。</p>
+  <p>特殊配對表的 5 維設計中，DEC_CUSTOM_NO 維度可以填萬用值 <code>XXXXX</code>。但若規則設「當條件命中時，付款人=任何客戶都用 X 客戶」這種寫法，無法表達「付款人=該客戶自己」這種語意。</p>
   <p>VR_EXP 提供了一種「動態替換」的能力：規則寫一次，但實際結果依當前報單的客戶而變。</p>
 
   <h3>8.2 實際使用情況</h3>
@@ -546,7 +546,7 @@
     <tr><td>cust_express_payer</td><td class="num">72</td><td class="num">9</td><td class="num">0</td><td>2017</td></tr>
     <tr><td>cust_express_payer_spec</td><td class="num">0</td><td class="num">0</td><td class="num">3</td><td>2020</td></tr>
   </table>
-  <p>cust_express_payer 從 2017 起 8 年無新增，spec 表 5 年無新增。實務上業務變動是否仍透過此機制設定，待五崧確認。</p>
+  <p>cust_express_payer 從 2017 起 8 年無新增，特殊配對表 5 年無新增。實務上業務變動是否仍透過此機制設定，待五崧確認。</p>
 
   <h3>10.2 近一年活躍度（custpayer）</h3>
   <p>把 custpayer 109 筆規則的「納稅義務人」對照過去一年（2025-04 ~ 2026-04）SCUSDEC 是否有報單：</p>
@@ -627,7 +627,7 @@
     <ol>
       <li>21 條 custpayer dead rule 候選（含 [刪除] 奇美電子 10 筆）是否可清理</li>
       <li>82227x（永通舊代碼）7 筆殭屍規則是否可刪</li>
-      <li>spec 表 3 筆規則過去一年命中為 0，是否仍要保留</li>
+      <li>特殊配對表 3 筆規則過去一年命中為 0，是否仍要保留</li>
       <li>D999 費用代碼的用途（新系統是否仍需）</li>
       <li>cust_express_payer 8 年無新增、spec 5 年無新增，新增/維護流程是否仍存在</li>
       <li>A647 / C001 友達光電同名雙碼歷史 mapping 待釐清（A098 / B001 台積電已由 <code>CustomerBondedBranch</code> 設計處理）</li>
@@ -820,7 +820,7 @@
 <div class="section">
   <h2>五、後台規則管理介面</h2>
 
-  <p>現行三張表沒有 UI 維護介面，新增/修改規則靠 IT 直接寫 SQL。從規則年代分布觀察：cust_express_payer 已 8 年無新增、spec 表 5 年無新增、custpayer 近 3 年僅 3 筆，極可能是「想改但沒人會改」造成的設定凍結。</p>
+  <p>現行三張表沒有 UI 維護介面，新增/修改規則靠 IT 直接寫 SQL。從規則年代分布觀察：cust_express_payer 已 8 年無新增、特殊配對表 5 年無新增、custpayer 近 3 年僅 3 筆，極可能是「想改但沒人會改」造成的設定凍結。</p>
 
   <div class="success-box">
     <strong>建議新增功能</strong>
